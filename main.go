@@ -13,7 +13,7 @@ func main() {
 		insert(i, []string{"AppelBanaan", "B"})
 	}
 
-	table, err := CreateSSTableFromMetable(&memtable)
+	table, err := CreateSSTableFromMetable(&memtable, 40)
 
 	fmt.Printf("%v", table.Blocks)
 	fmt.Println("")

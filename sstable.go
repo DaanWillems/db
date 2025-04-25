@@ -12,8 +12,7 @@ type SSTable struct {
 	Blocks *[]byte
 }
 
-func CreateSSTableFromMetable(memtable *Memtable) (*SSTable, error) {
-	blockSize := 40 // 4 bytes
+func CreateSSTableFromMetable(memtable *Memtable, blockSize int) (*SSTable, error) {
 	currentBlock := []byte{}
 	blocks := []byte{}
 
