@@ -1,15 +1,19 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"errors"
+	"fmt"
+	"os"
 )
 
 type SSTable struct {
-  Blocks *[]byte
+	Blocks *[]byte
 }
 
 func CreateSSTableFromMetable(memtable *Memtable) (*SSTable, error) {
-	blockSize := 11 // 4 bytes
+	blockSize := 40 // 4 bytes
 	currentBlock := []byte{}
 	blocks := []byte{}
 
@@ -43,4 +47,60 @@ func CreateSSTableFromMetable(memtable *Memtable) (*SSTable, error) {
 	blocks = append(blocks, currentBlock...)
 
 	return &SSTable{Blocks: &blocks}, nil
+}
+
+func (table *SSTable) Flush(path string) error {
+	return os.WriteFile(path, *table.Blocks, 0644)
+}
+
+func SearchInSSTable(path string, searchId []byte) (MemtableEntry, error) {
+
+
+	fd, err := os.Open(path)
+	if err != nil { //error handler
+		return MemtableEntry{}, err
+	}
+
+	reader := bufio.NewReader(fd) // creates a new reader
+
+	for {
+		idSize := make([]byte, 1)
+		_, err = reader.Read(idSize)
+
+		if err != nil {
+			return MemtableEntry{}, err
+		}
+
+		if idSize[0] == byte(0) {
+			continue
+		}
+
+		id := make([]byte, int(idSize[0]))
+		contentLength := make([]byte, 1)
+
+		_, err = reader.Read(id)
+		_, err = reader.Read(contentLength)
+
+		if !bytes.Equal(id, searchId) {
+			reader.Discard(int(contentLength[0]))
+			continue
+		}
+
+		content := make([]byte, contentLength[0])
+		_, err := reader.Read(content)
+
+		if err != nil {
+			return MemtableEntry{}, err
+		}
+
+    all := []byte{}
+		all = append(all, idSize...) 
+		all = append(all, id...) 
+		all = append(all, contentLength...)
+		all = append(all, content...)
+
+		fmt.Printf("%v \n", all)
+		fmt.Println("")
+		return MemtableEntry{}, nil
+	}
 }

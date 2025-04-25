@@ -19,6 +19,8 @@ func (entry *MemtableEntry) Deserialize(bytes []byte) {
 	entry.id = bytes[index:index+id_size]
 	index += id_size
 
+	index++ // We can skip the total content length
+
   deleted_i := int(bytes[index])
 	entry.deleted = false
 	if deleted_i == 1 {
@@ -42,19 +44,25 @@ func (entry *MemtableEntry) Deserialize(bytes []byte) {
 }
 
 func (entry *MemtableEntry) Serialize() (int, []byte) {
-	bytes := []byte{}
-	bytes = append(bytes, byte(len(entry.id)))
+	content_bytes := []byte{}
+
+	bytes := []byte{byte(len(entry.id))}
 	bytes = append(bytes, entry.id...)
+
 	if entry.deleted {
-		bytes = append(bytes, byte(1))
+		content_bytes = append(content_bytes, byte(1))
 	} else {
-		bytes = append(bytes, byte(0))
+		content_bytes = append(content_bytes, byte(0))
 	}
-	bytes = append(bytes, byte(len(entry.values)))
+	content_bytes = append(content_bytes, byte(len(entry.values)))
 	for _, v := range entry.values {
-		bytes = append(bytes, byte(int(len(v))))
-		bytes = append(bytes, []byte(v)...)
+		content_bytes = append(content_bytes, byte(int(len(v))))
+		content_bytes = append(content_bytes, []byte(v)...)
 	}
+
+  bytes = append(bytes, byte(len(content_bytes)))
+  bytes = append(bytes, content_bytes...)
+
 	return len(bytes), bytes
 }
 
@@ -70,9 +78,8 @@ func NewMemtable() Memtable {
 
 func (m *Memtable) Get(id []byte) *MemtableEntry {
 	for e := m.entries.Front(); e != nil; e = e.Next() {
-		next := e.Next()
-		if next != nil && bytes.Equal(id, next.Value.(MemtableEntry).id) {
-			entry := next.Value.(MemtableEntry)
+		if bytes.Equal(id, e.Value.(MemtableEntry).id) {
+			entry := e.Value.(MemtableEntry)
 			return &entry
 		}
 	}

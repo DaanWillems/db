@@ -8,23 +8,32 @@ var memtable Memtable
 
 func main() {
 	init_db()
-	insert(1, []string{"a"})
-	insert(2, []string{"a"})
-	insert(3, []string{"a"})
-	insert(4, []string{"a"})
+
+	for i := range 100 {
+		insert(i, []string{"AppelBanaan", "B"})
+	}
 
 	table, err := CreateSSTableFromMetable(&memtable)
+
+	fmt.Printf("%v", table.Blocks)
+	fmt.Println("")
+
 	if err != nil {
 		fmt.Printf("Error: %s", err)
 		fmt.Println("")
 		return
 	}
 
-	fmt.Printf("Len: %d", len(*table.Blocks))
-	fmt.Printf("%08b\n", *table.Blocks)
-	fmt.Printf("%v", *table.Blocks)
-	fmt.Println("")
+	table.Flush("./test.db")
+	_, err = SearchInSSTable("./test.db", []byte{byte(102)})
+
+	if err != nil {
+			fmt.Printf("Error: %s", err)
+			fmt.Println("")
+			return
+		}
 }
+	
 
 func init_db() {
 	memtable = NewMemtable()
