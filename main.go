@@ -9,11 +9,11 @@ var memtable Memtable
 func main() {
 	init_db()
 
-	for i := range 100 {
-		insert(i, []string{"AppelBanaan", "B"})
+	for i := range 8 {
+		insert(i, []string{"aa"})
 	}
 
-	table, err := CreateSSTableFromMetable(&memtable, 40)
+	table, err := CreateSSTableFromMetable(&memtable, 10)
 
 	fmt.Printf("%v", table.Blocks)
 	fmt.Println("")
@@ -25,15 +25,16 @@ func main() {
 	}
 
 	table.Flush("./test.db")
-	_, err = SearchInSSTable("./test.db", []byte{byte(102)})
+	entry, err := SearchInSSTable("./test.db", []byte{byte(2)})
 
 	if err != nil {
-			fmt.Printf("Error: %s", err)
-			fmt.Println("")
-			return
-		}
+		fmt.Printf("Error: %s", err)
+		fmt.Println("")
+		return
+	}
+	fmt.Printf("%v", entry)
+	fmt.Println("")
 }
-	
 
 func init_db() {
 	memtable = NewMemtable()
@@ -42,7 +43,7 @@ func init_db() {
 func insert(id int, values []string) {
 	byteValues := [][]byte{}
 	for _, v := range values {
-    byteValues = append(byteValues, []byte(v))
+		byteValues = append(byteValues, []byte(v))
 	}
 	memtable.Insert([]byte{byte(id)}, byteValues)
 }

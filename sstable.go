@@ -27,9 +27,8 @@ func CreateSSTableFromMetable(memtable *Memtable, blockSize int) (*SSTable, erro
 				return &SSTable{}, errors.New("Entry larger than max block size")
 			}
 			//Pad remainder of block
-			for range blockSize - len(currentBlock) {
-				currentBlock = append(currentBlock, byte(0))
-			}
+			padding := blockSize - len(currentBlock)
+			currentBlock = append(currentBlock, make([]byte, padding)...)
 			//Prepare new block
 			blocks = append(blocks, currentBlock...)
 			currentBlock = []byte{}
@@ -100,6 +99,8 @@ func SearchInSSTable(path string, searchId []byte) (MemtableEntry, error) {
 
 		fmt.Printf("%v \n", all)
 		fmt.Println("")
-		return MemtableEntry{}, nil
+		entry := MemtableEntry{}
+		entry.Deserialize(all)
+		return entry, nil
 	}
 }
