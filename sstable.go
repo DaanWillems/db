@@ -77,7 +77,14 @@ func SearchInSSTable(path string, searchId []byte) (MemtableEntry, error) {
 		contentLength := make([]byte, 1)
 
 		_, err = reader.Read(id)
+		if err != nil {
+			return MemtableEntry{}, err
+		}
+
 		_, err = reader.Read(contentLength)
+		if err != nil {
+			return MemtableEntry{}, err
+		}
 
 		if !bytes.Equal(id, searchId) {
 			reader.Discard(int(contentLength[0]))
