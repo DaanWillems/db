@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"fmt"
 	"reflect"
 	"testing"
 )
@@ -14,24 +13,26 @@ func TestSSTable(t *testing.T) {
 	memtable = NewMemtable()
 
 	for id := range 10 {
-		memtable.Insert([]byte{byte(id)}, [][]byte{[]byte{byte(id)}, []byte("b")})
+		memtable.Insert([]byte{byte(id)}, [][]byte{{byte(id)}, []byte("b")})
 	}
 
 	table, _ := CreateSSTableFromMetable(&memtable, 10)
 
 	tableBytes := table.Bytes()
-	fmt.Printf("%v", tableBytes)
 
 	reader := bufio.NewReader(bytes.NewReader(tableBytes))
-	result, _ := SearchInSSTable(reader, []byte{byte(2)})
 
-	entry := MemtableEntry{
-		[]byte{byte(2)},
-		[][]byte{{byte(2)}, []byte("b")},
-		false,
-	}
+	for id := range 10 {
+		result, _ := SearchInSSTable(reader, []byte{byte(id)})
 
-	if !reflect.DeepEqual(entry, result) {
-		t.Errorf("Result does not match query. \nExpected: \n%v\n Got:\n %v", entry, result)
+		entry := MemtableEntry{
+			[]byte{byte(id)},
+			[][]byte{{byte(id)}, []byte("b")},
+			false,
+		}
+
+		if !reflect.DeepEqual(entry, result) {
+			t.Errorf("Result does not match query. \nExpected: \n%v\n Got:\n %v", entry, result)
+		}
 	}
 }

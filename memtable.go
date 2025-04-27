@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"container/list"
 	"fmt"
+	"io"
 )
 
 type MemtableEntry struct {
@@ -12,35 +13,54 @@ type MemtableEntry struct {
 	deleted bool
 }
 
-func (entry *MemtableEntry) Deserialize(entryBytes []byte) {
+func (entry *MemtableEntry) Deserialize(entryBytes []byte) error {
 	buf := bytes.NewBuffer(entryBytes)
 
-  idLen, _ := buf.ReadByte()
-	id := make([]byte, idLen)
-  buf.Read(id)
-	entry.id = id
-
-  buf.ReadByte() //Discard content length
-  
-	deleted_i, _ := buf.ReadByte()
-
-	entry.deleted = false
-	if int(deleted_i) == 1 {
-   entry.deleted = true
+	idLen, err := buf.ReadByte()
+	if err == io.EOF {
+		return io.ErrUnexpectedEOF
 	}
 
-  valuesCount, _ := buf.ReadByte()
+	id := make([]byte, idLen)
+	_, err = buf.Read(id)
+	if err == io.EOF {
+		return io.ErrUnexpectedEOF
+	}
+	entry.id = id
 
-  for range valuesCount {
-    valueLen, _ := buf.ReadByte()
+	_, err = buf.ReadByte() //Discard content length
+	if err == io.EOF {
+		return io.ErrUnexpectedEOF
+	}
+	deleted_i, err := buf.ReadByte()
+	if err == io.EOF {
+		return io.ErrUnexpectedEOF
+	}
+	entry.deleted = false
+	if int(deleted_i) == 1 {
+		entry.deleted = true
+	}
+
+	valuesCount, err := buf.ReadByte()
+	if err == io.EOF {
+		return io.ErrUnexpectedEOF
+	}
+	for range valuesCount {
+		valueLen, err := buf.ReadByte()
+		if err == io.EOF {
+			return io.ErrUnexpectedEOF
+		}
 		value := make([]byte, valueLen)
-		buf.Read(value)
+		_, err = buf.Read(value)
+		if err == io.EOF {
+			return io.ErrUnexpectedEOF
+		}
 		entry.values = append(entry.values, value)
 	}
 }
 
 func (entry *MemtableEntry) Serialize() (int, []byte) {
-  var header bytes.Buffer
+	var header bytes.Buffer
 	var content bytes.Buffer
 
 	header.WriteByte(byte(len(entry.id)))
@@ -55,13 +75,13 @@ func (entry *MemtableEntry) Serialize() (int, []byte) {
 	content.WriteByte(byte(len(entry.values)))
 	for _, v := range entry.values {
 		content.WriteByte(byte(len(v)))
-	  content.Write(v)
+		content.Write(v)
 	}
- 
-  contentBytes := content.Bytes()
+
+	contentBytes := content.Bytes()
 	header.WriteByte(byte(len(contentBytes)))
-  
-  bytes := append(header.Bytes(), content.Bytes()...)
+
+	bytes := append(header.Bytes(), content.Bytes()...)
 
 	return len(bytes), bytes
 }

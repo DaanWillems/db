@@ -54,7 +54,6 @@ func (table *SSTable) Bytes() []byte {
 }
 
 func SearchInSSTable(reader *bufio.Reader, searchId []byte) (MemtableEntry, error) {
-
 	for {
 		idSize := make([]byte, 1)
 		_, err := reader.Read(idSize)
