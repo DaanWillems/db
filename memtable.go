@@ -12,56 +12,56 @@ type MemtableEntry struct {
 	deleted bool
 }
 
-func (entry *MemtableEntry) Deserialize(bytes []byte) {
-	index := 0
-	id_size := int(bytes[index])
-	index++
-	entry.id = bytes[index:index+id_size]
-	index += id_size
+func (entry *MemtableEntry) Deserialize(entryBytes []byte) {
+	buf := bytes.NewBuffer(entryBytes)
 
-	index++ // We can skip the total content length
+  idLen, _ := buf.ReadByte()
+	id := make([]byte, idLen)
+  buf.Read(id)
+	entry.id = id
 
-  deleted_i := int(bytes[index])
+  buf.ReadByte() //Discard content length
+  
+	deleted_i, _ := buf.ReadByte()
+
 	entry.deleted = false
-	if deleted_i == 1 {
+	if int(deleted_i) == 1 {
    entry.deleted = true
 	}
 
-	index++
-  values_count := int(bytes[index])
-	index++
-	for range values_count {
-	  size := int(bytes[index])
-		index++
-		value := []byte{}
-		for range size {
-      value = append(value, bytes[index])
-			index++
-		}
-    
+  valuesCount, _ := buf.ReadByte()
+
+  for range valuesCount {
+    valueLen, _ := buf.ReadByte()
+		value := make([]byte, valueLen)
+		buf.Read(value)
 		entry.values = append(entry.values, value)
 	}
 }
 
 func (entry *MemtableEntry) Serialize() (int, []byte) {
-	content_bytes := []byte{}
+  var header bytes.Buffer
+	var content bytes.Buffer
 
-	bytes := []byte{byte(len(entry.id))}
-	bytes = append(bytes, entry.id...)
+	header.WriteByte(byte(len(entry.id)))
+	header.Write(entry.id)
 
 	if entry.deleted {
-		content_bytes = append(content_bytes, byte(1))
+		content.WriteByte(1)
 	} else {
-		content_bytes = append(content_bytes, byte(0))
-	}
-	content_bytes = append(content_bytes, byte(len(entry.values)))
-	for _, v := range entry.values {
-		content_bytes = append(content_bytes, byte(int(len(v))))
-		content_bytes = append(content_bytes, []byte(v)...)
+		content.WriteByte(0)
 	}
 
-  bytes = append(bytes, byte(len(content_bytes)))
-  bytes = append(bytes, content_bytes...)
+	content.WriteByte(byte(len(entry.values)))
+	for _, v := range entry.values {
+		content.WriteByte(byte(len(v)))
+	  content.Write(v)
+	}
+ 
+  contentBytes := content.Bytes()
+	header.WriteByte(byte(len(contentBytes)))
+  
+  bytes := append(header.Bytes(), content.Bytes()...)
 
 	return len(bytes), bytes
 }

@@ -38,10 +38,8 @@ func CreateSSTableFromMetable(memtable *Memtable, blockSize int) (*SSTable, erro
 	}
 
 	//Pad remainder of block
-	for range blockSize - len(currentBlock) {
-		currentBlock = append(currentBlock, byte(0))
-	}
-
+	padding := blockSize - len(currentBlock)
+	currentBlock = append(currentBlock, make([]byte, padding)...)
 	blocks = append(blocks, currentBlock...)
 
 	return &SSTable{Blocks: &blocks}, nil
@@ -52,7 +50,6 @@ func (table *SSTable) Flush(path string) error {
 }
 
 func SearchInSSTable(path string, searchId []byte) (MemtableEntry, error) {
-
 
 	fd, err := os.Open(path)
 	if err != nil { //error handler
@@ -98,9 +95,9 @@ func SearchInSSTable(path string, searchId []byte) (MemtableEntry, error) {
 			return MemtableEntry{}, err
 		}
 
-    all := []byte{}
-		all = append(all, idSize...) 
-		all = append(all, id...) 
+		all := []byte{}
+		all = append(all, idSize...)
+		all = append(all, id...)
 		all = append(all, contentLength...)
 		all = append(all, content...)
 
