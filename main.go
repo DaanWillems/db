@@ -1,16 +1,26 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"os"
 )
 
 var memtable Memtable
 
 func main() {
+	//Startup core processes
+	//Start write engine
+
+
+	//Start compactor
+
+
+	//Start REPL
 	init_db()
 
 	for i := range 8 {
-		insert(i, []string{"aa"})
+		insert(i, []string{"aab"})
 	}
 
 	table, err := CreateSSTableFromMetable(&memtable, 10)
@@ -25,7 +35,10 @@ func main() {
 	}
 
 	table.Flush("./test.db")
-	entry, err := SearchInSSTable("./test.db", []byte{byte(2)})
+	fd, err := os.Open("./test.db")
+	reader := bufio.NewReader(fd) // creates a new reader
+
+	entry, err := SearchInSSTable(reader, []byte{byte(2)})
 
 	if err != nil {
 		fmt.Printf("Error: %s", err)

@@ -49,18 +49,15 @@ func (table *SSTable) Flush(path string) error {
 	return os.WriteFile(path, *table.Blocks, 0644)
 }
 
-func SearchInSSTable(path string, searchId []byte) (MemtableEntry, error) {
+func (table *SSTable) Bytes() []byte {
+	return *table.Blocks
+}
 
-	fd, err := os.Open(path)
-	if err != nil { //error handler
-		return MemtableEntry{}, err
-	}
-
-	reader := bufio.NewReader(fd) // creates a new reader
+func SearchInSSTable(reader *bufio.Reader, searchId []byte) (MemtableEntry, error) {
 
 	for {
 		idSize := make([]byte, 1)
-		_, err = reader.Read(idSize)
+		_, err := reader.Read(idSize)
 
 		if err != nil {
 			return MemtableEntry{}, err
@@ -89,7 +86,7 @@ func SearchInSSTable(path string, searchId []byte) (MemtableEntry, error) {
 		}
 
 		content := make([]byte, contentLength[0])
-		_, err := reader.Read(content)
+		_, err = reader.Read(content)
 
 		if err != nil {
 			return MemtableEntry{}, err
