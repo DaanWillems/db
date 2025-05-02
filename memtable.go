@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"container/list"
+	"errors"
 	"fmt"
 	"io"
 )
@@ -16,47 +17,46 @@ type MemtableEntry struct {
 func (entry *MemtableEntry) Deserialize(entryBytes []byte) error {
 	buf := bytes.NewBuffer(entryBytes)
 
-	idLen, err := buf.ReadByte()
-	if err == io.EOF {
-		return io.ErrUnexpectedEOF
+	idLen, err := mustReadByte(buf)
+	if err != nil {
+		return err
 	}
 
-	id := make([]byte, idLen)
-	_, err = buf.Read(id)
-	if err == io.EOF {
-		return io.ErrUnexpectedEOF
+	id, err := mustReadN(buf, int(idLen))
+	if err != nil {
+		return err
 	}
 	entry.id = id
 
-	_, err = buf.ReadByte() //Discard content length
-	if err == io.EOF {
-		return io.ErrUnexpectedEOF
+	_, err = mustReadByte(buf) //Discard content length
+	if err != nil {
+		return err
 	}
-	deleted_i, err := buf.ReadByte()
-	if err == io.EOF {
-		return io.ErrUnexpectedEOF
+	deleted_i, err := mustReadByte(buf)
+	if err != nil {
+		return err
 	}
 	entry.deleted = false
 	if int(deleted_i) == 1 {
 		entry.deleted = true
 	}
 
-	valuesCount, err := buf.ReadByte()
-	if err == io.EOF {
-		return io.ErrUnexpectedEOF
+	valuesCount, err := mustReadByte(buf)
+	if err != nil {
+		return err
 	}
 	for range valuesCount {
-		valueLen, err := buf.ReadByte()
-		if err == io.EOF {
-			return io.ErrUnexpectedEOF
+		valueLen, err := mustReadByte(buf)
+		if err != nil {
+			return err
 		}
-		value := make([]byte, valueLen)
-		_, err = buf.Read(value)
-		if err == io.EOF {
-			return io.ErrUnexpectedEOF
+		value, err := mustReadN(buf, int(valueLen))
+		if err != nil {
+			return err
 		}
 		entry.values = append(entry.values, value)
 	}
+	return nil
 }
 
 func (entry *MemtableEntry) Serialize() (int, []byte) {
@@ -140,6 +140,33 @@ func (m *Memtable) Insert(id []byte, values [][]byte) {
 	}
 
 	m.entries.PushBack(entry)
+}
+
+func mustReadN(buf *bytes.Buffer, n int) ([]byte, error) {
+	b := make([]byte, n)
+	readN, err := buf.Read(b)
+
+	if err != nil {
+		if errors.Is(err, io.EOF) {
+			return nil, io.ErrUnexpectedEOF
+		}
+		return nil, err
+	}
+	if readN != n {
+		return nil, io.ErrUnexpectedEOF
+	}
+	return b, nil
+}
+
+func mustReadByte(buf *bytes.Buffer) (byte, error) {
+	b, err := buf.ReadByte()
+	if err != nil {
+		if errors.Is(err, io.EOF) {
+			return 0, io.ErrUnexpectedEOF
+		}
+		return 0, err
+	}
+	return b, nil
 }
 
 func (m *Memtable) Flush() {

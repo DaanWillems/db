@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
-	"fmt"
 	"os"
 )
 
@@ -97,8 +96,6 @@ func SearchInSSTable(reader *bufio.Reader, searchId []byte) (MemtableEntry, erro
 		all = append(all, contentLength...)
 		all = append(all, content...)
 
-		fmt.Printf("%v \n", all)
-		fmt.Println("")
 		entry := MemtableEntry{}
 		entry.Deserialize(all)
 		return entry, nil
