@@ -29,7 +29,7 @@ func TestSSTable(t *testing.T) {
 			false,
 		}
 
-		if !reflect.DeepEqual(entry, result) {
+		if !reflect.DeepEqual(&entry, result) {
 			t.Errorf("Result does not match query. \nExpected: \n%v\n Got:\n %v", entry, result)
 		}
 	}
