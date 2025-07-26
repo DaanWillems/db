@@ -1,4 +1,4 @@
-package main
+package database
 
 import (
 	"bufio"
@@ -11,7 +11,7 @@ type SSTable struct {
 	Blocks *[]byte
 }
 
-func CreateSSTableFromMetable(memtable *Memtable, blockSize int) (*SSTable, error) {
+func CreateSSTableFromMemtable(memtable *Memtable, blockSize int) (*SSTable, error) {
 	currentBlock := []byte{}
 	blocks := []byte{}
 
@@ -52,13 +52,13 @@ func (table *SSTable) Bytes() []byte {
 	return *table.Blocks
 }
 
-func SearchInSSTable(reader *bufio.Reader, searchId []byte) (MemtableEntry, error) {
+func SearchInSSTable(reader *bufio.Reader, searchId []byte) (*MemtableEntry, error) {
 	for {
 		idSize := make([]byte, 1)
 		_, err := reader.Read(idSize)
 
 		if err != nil {
-			return MemtableEntry{}, err
+			return &MemtableEntry{}, err
 		}
 
 		if idSize[0] == byte(0) {
@@ -70,12 +70,12 @@ func SearchInSSTable(reader *bufio.Reader, searchId []byte) (MemtableEntry, erro
 
 		_, err = reader.Read(id)
 		if err != nil {
-			return MemtableEntry{}, err
+			return &MemtableEntry{}, err
 		}
 
 		_, err = reader.Read(contentLength)
 		if err != nil {
-			return MemtableEntry{}, err
+			return &MemtableEntry{}, err
 		}
 
 		if !bytes.Equal(id, searchId) {
@@ -87,7 +87,7 @@ func SearchInSSTable(reader *bufio.Reader, searchId []byte) (MemtableEntry, erro
 		_, err = reader.Read(content)
 
 		if err != nil {
-			return MemtableEntry{}, err
+			return &MemtableEntry{}, err
 		}
 
 		all := []byte{}
@@ -96,7 +96,7 @@ func SearchInSSTable(reader *bufio.Reader, searchId []byte) (MemtableEntry, erro
 		all = append(all, contentLength...)
 		all = append(all, content...)
 
-		entry := MemtableEntry{}
+		entry := &MemtableEntry{}
 		entry.Deserialize(all)
 		return entry, nil
 	}

@@ -1,4 +1,4 @@
-package main
+package database
 
 import (
 	"bufio"
@@ -7,16 +7,14 @@ import (
 	"testing"
 )
 
-var testMemTable Memtable
-
 func TestSSTable(t *testing.T) {
-	memtable = NewMemtable()
+	memtable := NewMemtable()
 
 	for id := range 10 {
-		memtable.Insert([]byte{byte(id)}, [][]byte{{byte(id)}, []byte("b")})
+		memtable.InsertRaw([]byte{byte(id)}, [][]byte{{byte(id)}, []byte("b")})
 	}
 
-	table, _ := CreateSSTableFromMetable(&memtable, 10)
+	table, _ := CreateSSTableFromMemtable(&memtable, 10)
 
 	tableBytes := table.Bytes()
 

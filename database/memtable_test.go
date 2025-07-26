@@ -1,4 +1,4 @@
-package main
+package database
 
 import (
 	"bytes"
@@ -9,9 +9,9 @@ import (
 func TestMemtableOrderStr(t *testing.T) {
 	memtable := NewMemtable()
 
-	memtable.Insert([]byte("abc"), [][]byte{[]byte("a")})
-	memtable.Insert([]byte("bdq"), [][]byte{[]byte("a")})
-	memtable.Insert([]byte("abd"), [][]byte{[]byte("a")})
+	memtable.InsertRaw([]byte("abc"), [][]byte{[]byte("a")})
+	memtable.InsertRaw([]byte("bdq"), [][]byte{[]byte("a")})
+	memtable.InsertRaw([]byte("abd"), [][]byte{[]byte("a")})
 
 	entry := memtable.entries.Front()
 	if !bytes.Equal(entry.Value.(MemtableEntry).id, []byte("abc")) {
@@ -30,9 +30,9 @@ func TestMemtableOrderStr(t *testing.T) {
 func TestMemtableOrderInt(t *testing.T) {
 	memtable := NewMemtable()
 
-	memtable.Insert([]byte{byte(1)}, [][]byte{[]byte("a")})
-	memtable.Insert([]byte{byte(3)}, [][]byte{[]byte("a")})
-	memtable.Insert([]byte{byte(2)}, [][]byte{[]byte("a")})
+	memtable.InsertRaw([]byte{byte(1)}, [][]byte{[]byte("a")})
+	memtable.InsertRaw([]byte{byte(3)}, [][]byte{[]byte("a")})
+	memtable.InsertRaw([]byte{byte(2)}, [][]byte{[]byte("a")})
 
 	entry := memtable.entries.Front()
 	if !bytes.Equal(entry.Value.(MemtableEntry).id, []byte{byte(1)}) {

@@ -1,4 +1,4 @@
-package main
+package database
 
 type DbType int
 
@@ -14,9 +14,8 @@ var dbTypeName = map[DbType]string{
 	DbInt8Type:   "int8",
 }
 
-
 func (t DbType) String() string {
-  return dbTypeName[t]
+	return dbTypeName[t]
 }
 
 type Serializable interface {
@@ -24,7 +23,7 @@ type Serializable interface {
 }
 
 type DbString struct {
-  Value string
+	Value string
 }
 
 func (s DbString) Bytes() []byte {
@@ -32,7 +31,7 @@ func (s DbString) Bytes() []byte {
 }
 
 type DbInt8 struct {
-  Value int
+	Value int
 }
 
 func (i DbInt8) Bytes() []byte {

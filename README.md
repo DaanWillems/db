@@ -40,7 +40,7 @@ go build
 ### Run
 
 ```sh
-go run main.go
+go run .
 ```
 
 ### Test

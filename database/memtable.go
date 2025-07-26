@@ -1,4 +1,4 @@
-package main
+package database
 
 import (
 	"bytes"
@@ -123,23 +123,27 @@ func (m *Memtable) Update(id []byte, values [][]byte) {
 	return
 }
 
-func (m *Memtable) Insert(id []byte, values [][]byte) {
-
-	entry := MemtableEntry{
-		id:      id,
-		values:  values,
-		deleted: false,
-	}
+func (m *Memtable) Insert(entry MemtableEntry) {
 
 	for e := m.entries.Front(); e != nil; e = e.Next() {
 		next := e.Next()
-		if next != nil && bytes.Compare(id, next.Value.(MemtableEntry).id) == -1 {
+		if next != nil && bytes.Compare(entry.id, next.Value.(MemtableEntry).id) == -1 {
 			m.entries.InsertBefore(entry, next)
 			return
 		}
 	}
 
 	m.entries.PushBack(entry)
+}
+
+func (m Memtable) InsertRaw(id []byte, values [][]byte) {
+	entry := MemtableEntry{
+		id:      id,
+		values:  values,
+		deleted: false,
+	}
+
+	m.Insert(entry)
 }
 
 func mustReadN(buf *bytes.Buffer, n int) ([]byte, error) {
@@ -167,10 +171,6 @@ func mustReadByte(buf *bytes.Buffer) (byte, error) {
 		return 0, err
 	}
 	return b, nil
-}
-
-func (m *Memtable) Flush() {
-
 }
 
 func (m *Memtable) Print() {
