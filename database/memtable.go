@@ -120,11 +120,9 @@ func (m *Memtable) Update(id []byte, values [][]byte) {
 			return
 		}
 	}
-	return
 }
 
 func (m *Memtable) Insert(entry MemtableEntry) {
-
 	for e := m.entries.Front(); e != nil; e = e.Next() {
 		next := e.Next()
 		if next != nil && bytes.Compare(entry.id, next.Value.(MemtableEntry).id) == -1 {

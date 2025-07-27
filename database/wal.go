@@ -2,7 +2,6 @@ package database
 
 import (
 	"bufio"
-	"fmt"
 	"io"
 	"os"
 )
@@ -13,7 +12,16 @@ var wal_path string
 func OpenWAL(path string) {
 	var err error
 	wal_path = path
-	wal_file, err = os.Create(path)
+	wal_file, err = os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func ResetWAL() {
+	var err error
+	wal_file.Close()
+	wal_file, err = os.Create(wal_path)
 	if err != nil {
 		panic(err)
 	}
@@ -28,10 +36,10 @@ func WriteEntryToWal(entry MemtableEntry) {
 
 func ReplayWal() {
 	fd, err := os.Open(wal_path)
-
 	if err != nil {
 		panic(err)
 	}
+	defer fd.Close()
 
 	reader := bufio.NewReader(fd)
 
@@ -56,12 +64,6 @@ func ReplayWal() {
 		entry := &MemtableEntry{}
 		entry.Deserialize(content)
 
-		var str_result string
-
-		for _, v := range entry.values {
-			str_result += string(v)
-		}
-
-		fmt.Printf("%v %v\n", entry.id, str_result)
+		memtable.Insert(*entry)
 	}
 }

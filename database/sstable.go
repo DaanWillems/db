@@ -23,7 +23,7 @@ func CreateSSTableFromMemtable(memtable *Memtable, blockSize int) (*SSTable, err
 		if size > (blockSize - len(currentBlock)) {
 			if size > blockSize {
 				//Will never fit
-				return &SSTable{}, errors.New("Entry larger than max block size")
+				return &SSTable{}, errors.New("entry larger than max block size")
 			}
 			//Pad remainder of block
 			padding := blockSize - len(currentBlock)
