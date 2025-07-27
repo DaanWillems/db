@@ -14,7 +14,8 @@ var config Config
 
 func InitializeDatabase(cfg Config) {
 	memtable = NewMemtable()
-	OpenWAL("wal.txt")
+	ReplayWal("wal")
+	OpenWAL("wal")
 	config = cfg
 }
 
@@ -42,7 +43,7 @@ func Insert(id int, values []string) {
 		table.Flush("./test.db")
 
 		memtable = NewMemtable() // Reset memtable after flushing
-		ResetWAL()
+		ResetWAL()               //Discard the WAL
 	}
 }
 

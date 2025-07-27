@@ -34,9 +34,12 @@ func WriteEntryToWal(entry MemtableEntry) {
 	wal_file.Sync()
 }
 
-func ReplayWal() {
-	fd, err := os.Open(wal_path)
+func ReplayWal(_wal_path string) {
+	fd, err := os.Open(_wal_path)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return
+		}
 		panic(err)
 	}
 	defer fd.Close()
