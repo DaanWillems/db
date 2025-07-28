@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
-	"os"
+	"io"
 )
 
 type SSTable struct {
@@ -44,10 +44,6 @@ func CreateSSTableFromMemtable(memtable *Memtable, blockSize int) (*SSTable, err
 	return &SSTable{Blocks: &blocks}, nil
 }
 
-func (table *SSTable) Flush(path string) error {
-	return os.WriteFile(path, *table.Blocks, 0644)
-}
-
 func (table *SSTable) Bytes() []byte {
 	return *table.Blocks
 }
@@ -58,6 +54,9 @@ func SearchInSSTable(reader *bufio.Reader, searchId []byte) (*MemtableEntry, err
 		_, err := reader.Read(idSize)
 
 		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return nil, nil
+			}
 			return &MemtableEntry{}, err
 		}
 

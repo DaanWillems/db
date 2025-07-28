@@ -2,6 +2,7 @@ package database
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 )
 
@@ -14,8 +15,9 @@ var config Config
 
 func InitializeDatabase(cfg Config) {
 	memtable = NewMemtable()
-	ReplayWal("wal")
-	OpenWAL("wal")
+	LoadFileIndex()
+	ReplayWal("./data/wal")
+	OpenWAL("./data/wal")
 	config = cfg
 }
 
@@ -35,12 +37,12 @@ func Insert(id int, values []string) {
 	memtable.Insert(entry)
 
 	if memtable.entries.Len() >= config.MemtableSize {
-		table, err := CreateSSTableFromMemtable(&memtable, 10)
+		table, err := CreateSSTableFromMemtable(&memtable, 100)
 		if err != nil {
 			panic(err)
 		}
 
-		table.Flush("./test.db")
+		WriteDataFile(table)
 
 		memtable = NewMemtable() // Reset memtable after flushing
 		ResetWAL()               //Discard the WAL
@@ -55,20 +57,26 @@ func Query(id int) ([]byte, error) {
 		return entry.values[0], nil
 	}
 
-	//For now we only have the capability of writing and reading a single sstable from disk
-	fd, err := os.Open("./test.db")
+	for _, path := range getDataIndex() {
+		fd, err := os.Open(fmt.Sprintf("./data/%v", path))
 
-	if err != nil {
-		panic(err)
+		if err != nil {
+			panic(err)
+		}
+
+		reader := bufio.NewReader(fd)
+		entry, err = SearchInSSTable(reader, []byte{byte(id)})
+
+		if err != nil {
+			panic(err)
+		}
+
+		if entry == nil {
+			continue
+		}
+
+		return entry.values[0], nil
 	}
 
-	reader := bufio.NewReader(fd) // creates a new reader
-
-	entry, err = SearchInSSTable(reader, []byte{byte(id)})
-
-	if err != nil {
-		panic(err)
-	}
-
-	return entry.values[0], nil
+	return nil, nil
 }

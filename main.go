@@ -7,17 +7,14 @@ import (
 
 func main() {
 	database.InitializeDatabase(database.Config{
-		MemtableSize: 4,
+		MemtableSize: 20,
 	})
 
-	// database.Insert(1, []string{"a"})
-	// database.Insert(2, []string{"b"})
-	// database.Insert(2, []string{"c"})
-	// database.Insert(4, []string{"d"})
-	// database.Insert(5, []string{"e"})
-	// database.Insert(6, []string{"f"})
+	for i := range 200 {
+		database.Insert(i, []string{fmt.Sprintf("%v", i)})
+	}
 
-	result, err := database.Query(1)
+	result, err := database.Query(80)
 
 	if err != nil {
 		panic(err)
