@@ -1,6 +1,6 @@
-# Simple Go Key-Value Database
+# Simple Go Key-Value storage
 
-This project is a simple key-value database implemented in Go. It features an in-memory table (memtable), write-ahead logging (WAL), and persistent storage using SSTables. The database supports basic schema management and serialization of different data types.
+This project is a simple key-value storage implemented in Go. It features an in-memory table (memtable), write-ahead logging (WAL), and persistent storage using SSTables. The storage supports basic schema management and serialization of different data types.
 
 ## Features
 

@@ -1,4 +1,4 @@
-package database
+package storage
 
 import (
 	"bufio"
@@ -11,14 +11,14 @@ type SSTable struct {
 	Blocks *[]byte
 }
 
-func CreateSSTableFromMemtable(memtable *Memtable, blockSize int) (*SSTable, error) {
+func createSSTableFromMemtable(memtable *Memtable, blockSize int) (*SSTable, error) {
 	currentBlock := []byte{}
 	blocks := []byte{}
 
 	for e := memtable.entries.Front(); e != nil; e = e.Next() {
 		entry := e.Value.(MemtableEntry)
 
-		size, serialized_entry := entry.Serialize()
+		size, serialized_entry := entry.serialize()
 		//Check to see if there is enough place in the block to add the entry
 		if size > (blockSize - len(currentBlock)) {
 			if size > blockSize {
@@ -44,11 +44,11 @@ func CreateSSTableFromMemtable(memtable *Memtable, blockSize int) (*SSTable, err
 	return &SSTable{Blocks: &blocks}, nil
 }
 
-func (table *SSTable) Bytes() []byte {
+func (table *SSTable) bytes() []byte {
 	return *table.Blocks
 }
 
-func SearchInSSTable(reader *bufio.Reader, searchId []byte) (*MemtableEntry, error) {
+func searchInSSTable(reader *bufio.Reader, searchId []byte) (*MemtableEntry, error) {
 	for {
 		idSize := make([]byte, 1)
 		_, err := reader.Read(idSize)
@@ -96,7 +96,7 @@ func SearchInSSTable(reader *bufio.Reader, searchId []byte) (*MemtableEntry, err
 		all = append(all, content...)
 
 		entry := &MemtableEntry{}
-		entry.Deserialize(all)
+		entry.deserialize(all)
 		return entry, nil
 	}
 }

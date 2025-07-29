@@ -1,20 +1,20 @@
 package main
 
 import (
-	"db/database"
+	storage "db/storage"
 	"fmt"
 )
 
 func main() {
-	database.InitializeDatabase(database.Config{
+	storage.InitializeStorageEngine(storage.Config{
 		MemtableSize: 20,
 	})
 
-	for i := range 200 {
-		database.Insert(i, []string{fmt.Sprintf("%v", i)})
-	}
+	// for i := range 200 {
+	// 	storage.Insert(i, []string{fmt.Sprintf("%v", i)})
+	// }
 
-	result, err := database.Query(80)
+	result, err := storage.Query(80)
 
 	if err != nil {
 		panic(err)

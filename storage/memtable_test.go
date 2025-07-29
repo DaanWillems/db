@@ -1,4 +1,4 @@
-package database
+package storage
 
 import (
 	"bytes"
@@ -9,9 +9,9 @@ import (
 func TestMemtableOrderStr(t *testing.T) {
 	memtable := NewMemtable()
 
-	memtable.InsertRaw([]byte("abc"), [][]byte{[]byte("a")})
-	memtable.InsertRaw([]byte("bdq"), [][]byte{[]byte("a")})
-	memtable.InsertRaw([]byte("abd"), [][]byte{[]byte("a")})
+	memtable.insertRaw([]byte("abc"), [][]byte{[]byte("a")})
+	memtable.insertRaw([]byte("bdq"), [][]byte{[]byte("a")})
+	memtable.insertRaw([]byte("abd"), [][]byte{[]byte("a")})
 
 	entry := memtable.entries.Front()
 	if !bytes.Equal(entry.Value.(MemtableEntry).id, []byte("abc")) {
@@ -30,9 +30,9 @@ func TestMemtableOrderStr(t *testing.T) {
 func TestMemtableOrderInt(t *testing.T) {
 	memtable := NewMemtable()
 
-	memtable.InsertRaw([]byte{byte(1)}, [][]byte{[]byte("a")})
-	memtable.InsertRaw([]byte{byte(3)}, [][]byte{[]byte("a")})
-	memtable.InsertRaw([]byte{byte(2)}, [][]byte{[]byte("a")})
+	memtable.insertRaw([]byte{byte(1)}, [][]byte{[]byte("a")})
+	memtable.insertRaw([]byte{byte(3)}, [][]byte{[]byte("a")})
+	memtable.insertRaw([]byte{byte(2)}, [][]byte{[]byte("a")})
 
 	entry := memtable.entries.Front()
 	if !bytes.Equal(entry.Value.(MemtableEntry).id, []byte{byte(1)}) {
@@ -55,9 +55,9 @@ func TestSerializeDeserializeStr(t *testing.T) {
 		deleted: false,
 	}
 
-	_, s := e.Serialize()
+	_, s := e.serialize()
 	e1 := MemtableEntry{}
-	e1.Deserialize(s)
+	e1.deserialize(s)
 
 	if !reflect.DeepEqual(e, e1) {
 		t.Errorf("Deserialized struct does not match original.\n Expected \n%v \n got \n%v", e, e1)
@@ -71,9 +71,9 @@ func TestSerializeDeserialize(t *testing.T) {
 		deleted: false,
 	}
 
-	_, s := e.Serialize()
+	_, s := e.serialize()
 	e1 := MemtableEntry{}
-	e1.Deserialize(s)
+	e1.deserialize(s)
 
 	if !reflect.DeepEqual(e, e1) {
 		t.Errorf("Deserialized struct does not match original.\n Expected \n%v \n got \n%v", e, e1)

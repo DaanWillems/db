@@ -1,4 +1,4 @@
-package database
+package storage
 
 import (
 	"bytes"
@@ -14,7 +14,7 @@ type MemtableEntry struct {
 	deleted bool
 }
 
-func (entry *MemtableEntry) Deserialize(entryBytes []byte) error {
+func (entry *MemtableEntry) deserialize(entryBytes []byte) error {
 	buf := bytes.NewBuffer(entryBytes)
 
 	idLen, err := mustReadByte(buf)
@@ -59,7 +59,7 @@ func (entry *MemtableEntry) Deserialize(entryBytes []byte) error {
 	return nil
 }
 
-func (entry *MemtableEntry) Serialize() (int, []byte) {
+func (entry *MemtableEntry) serialize() (int, []byte) {
 	var header bytes.Buffer
 	var content bytes.Buffer
 
@@ -90,7 +90,7 @@ type Memtable struct {
 	entries *list.List
 }
 
-func NewMemtable() Memtable {
+func newMemtable() Memtable {
 	return Memtable{
 		entries: list.New(),
 	}
@@ -106,7 +106,7 @@ func (m *Memtable) Get(id []byte) *MemtableEntry {
 	return nil
 }
 
-func (m *Memtable) Update(id []byte, values [][]byte) {
+func (m *Memtable) update(id []byte, values [][]byte) {
 
 	entry := MemtableEntry{
 		id:      id,
@@ -122,7 +122,7 @@ func (m *Memtable) Update(id []byte, values [][]byte) {
 	}
 }
 
-func (m *Memtable) Insert(entry MemtableEntry) {
+func (m *Memtable) insert(entry MemtableEntry) {
 	for e := m.entries.Front(); e != nil; e = e.Next() {
 		next := e.Next()
 		if next != nil && bytes.Compare(entry.id, next.Value.(MemtableEntry).id) == -1 {
@@ -134,14 +134,14 @@ func (m *Memtable) Insert(entry MemtableEntry) {
 	m.entries.PushBack(entry)
 }
 
-func (m Memtable) InsertRaw(id []byte, values [][]byte) {
+func (m Memtable) insertRaw(id []byte, values [][]byte) {
 	entry := MemtableEntry{
 		id:      id,
 		values:  values,
 		deleted: false,
 	}
 
-	m.Insert(entry)
+	m.insert(entry)
 }
 
 func mustReadN(buf *bytes.Buffer, n int) ([]byte, error) {

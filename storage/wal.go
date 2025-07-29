@@ -1,4 +1,4 @@
-package database
+package storage
 
 import (
 	"bufio"
@@ -9,7 +9,7 @@ import (
 var wal_file *os.File
 var wal_path string
 
-func OpenWAL(path string) {
+func openWAL(path string) {
 	var err error
 	wal_path = path
 	wal_file, err = os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
@@ -18,7 +18,7 @@ func OpenWAL(path string) {
 	}
 }
 
-func ResetWAL() {
+func resetWAL() {
 	var err error
 	wal_file.Close()
 	wal_file, err = os.Create(wal_path)
@@ -27,14 +27,14 @@ func ResetWAL() {
 	}
 }
 
-func WriteEntryToWal(entry MemtableEntry) {
-	len, content := entry.Serialize()
+func writeEntryToWal(entry MemtableEntry) {
+	len, content := entry.serialize()
 	wal_file.Write([]byte{byte(len)})
 	wal_file.Write(content)
 	wal_file.Sync()
 }
 
-func ReplayWal(_wal_path string) {
+func replayWal(_wal_path string) {
 	fd, err := os.Open(_wal_path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -65,8 +65,8 @@ func ReplayWal(_wal_path string) {
 		}
 
 		entry := &MemtableEntry{}
-		entry.Deserialize(content)
+		entry.deserialize(content)
 
-		memtable.Insert(*entry)
+		memtable.insert(*entry)
 	}
 }

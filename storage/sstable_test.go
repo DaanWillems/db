@@ -1,4 +1,4 @@
-package database
+package storage
 
 import (
 	"bufio"
@@ -11,17 +11,17 @@ func TestSSTable(t *testing.T) {
 	memtable := NewMemtable()
 
 	for id := range 10 {
-		memtable.InsertRaw([]byte{byte(id)}, [][]byte{{byte(id)}, []byte("b")})
+		memtable.insertRaw([]byte{byte(id)}, [][]byte{{byte(id)}, []byte("b")})
 	}
 
-	table, _ := CreateSSTableFromMemtable(&memtable, 10)
+	table, _ := createSSTableFromMemtable(&memtable, 10)
 
-	tableBytes := table.Bytes()
+	tableBytes := table.bytes()
 
 	reader := bufio.NewReader(bytes.NewReader(tableBytes))
 
 	for id := range 10 {
-		result, _ := SearchInSSTable(reader, []byte{byte(id)})
+		result, _ := searchInSSTable(reader, []byte{byte(id)})
 
 		entry := MemtableEntry{
 			[]byte{byte(id)},

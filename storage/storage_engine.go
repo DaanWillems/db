@@ -1,4 +1,4 @@
-package database
+package storage
 
 import (
 	"bufio"
@@ -13,11 +13,11 @@ type Config struct {
 var memtable Memtable
 var config Config
 
-func InitializeDatabase(cfg Config) {
-	memtable = NewMemtable()
-	LoadFileIndex()
-	ReplayWal("./data/wal")
-	OpenWAL("./data/wal")
+func InitializeStorageEngine(cfg Config) {
+	memtable = newMemtable()
+	loadFileLedger()
+	replayWal("./data/wal")
+	openWAL("./data/wal")
 	config = cfg
 }
 
@@ -33,19 +33,19 @@ func Insert(id int, values []string) {
 		deleted: false,
 	}
 
-	WriteEntryToWal(entry)
-	memtable.Insert(entry)
+	writeEntryToWal(entry)
+	memtable.insert(entry)
 
 	if memtable.entries.Len() >= config.MemtableSize {
-		table, err := CreateSSTableFromMemtable(&memtable, 100)
+		table, err := createSSTableFromMemtable(&memtable, 100)
 		if err != nil {
 			panic(err)
 		}
 
-		WriteDataFile(table)
+		writeDataFile(table)
 
-		memtable = NewMemtable() // Reset memtable after flushing
-		ResetWAL()               //Discard the WAL
+		memtable = newMemtable() // Reset memtable after flushing
+		resetWAL()               //Discard the WAL
 	}
 }
 
@@ -65,7 +65,7 @@ func Query(id int) ([]byte, error) {
 		}
 
 		reader := bufio.NewReader(fd)
-		entry, err = SearchInSSTable(reader, []byte{byte(id)})
+		entry, err = searchInSSTable(reader, []byte{byte(id)})
 
 		if err != nil {
 			panic(err)
