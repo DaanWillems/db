@@ -18,7 +18,18 @@ func InitializeStorageEngine(cfg Config) {
 	loadFileLedger()
 	replayWal("./data/wal")
 	openWAL("./data/wal")
+	compact()
 	config = cfg
+}
+
+func compact() {
+	index := getDataIndex()
+
+	if len(index) < 2 {
+		return
+	}
+
+	compactSSTables(fmt.Sprintf("./data/%v", index[0]), fmt.Sprintf("./data/%v", index[1]), "./test")
 }
 
 func Insert(id int, values []string) {
