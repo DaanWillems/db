@@ -208,52 +208,6 @@ func (table *SSTable) bytes() []byte {
 	return *table.Blocks
 }
 
-func readEntryFromSSTable(reader *bufio.Reader) (MemtableEntry, error) {
-	idSize := make([]byte, 1)
-
-	for {
-		_, err := reader.Read(idSize)
-
-		if err != nil {
-			return MemtableEntry{}, err
-		}
-
-		if idSize[0] != byte(0) {
-			break
-		}
-	}
-
-	id := make([]byte, int(idSize[0]))
-	contentLength := make([]byte, 1)
-
-	_, err := reader.Read(id)
-	if err != nil {
-		return MemtableEntry{}, err
-	}
-
-	_, err = reader.Read(contentLength)
-	if err != nil {
-		return MemtableEntry{}, err
-	}
-
-	content := make([]byte, contentLength[0])
-	_, err = reader.Read(content)
-
-	if err != nil {
-		return MemtableEntry{}, err
-	}
-
-	all := []byte{}
-	all = append(all, idSize...)
-	all = append(all, id...)
-	all = append(all, contentLength...)
-	all = append(all, content...)
-
-	entry := MemtableEntry{}
-	entry.deserialize(all)
-	return entry, nil
-}
-
 func searchInSSTable(reader *bufio.Reader, searchId []byte) (*MemtableEntry, error) {
 	for {
 		idSize := make([]byte, 1)
