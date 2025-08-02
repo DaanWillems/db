@@ -13,6 +13,10 @@ type SSTable struct {
 	Blocks *[]byte
 }
 
+type SSTableWriter struct {
+	writer *bufio.Writer
+}
+
 type SSTableReader struct {
 	reader *bufio.Reader
 }
@@ -24,6 +28,16 @@ func newSSTableReader(path string) SSTableReader {
 	}
 	return SSTableReader{
 		reader: bufio.NewReader(fd),
+	}
+}
+
+func newSSTableWriter(path string) SSTableWriter {
+	fd, err := os.Create(path)
+	if err != nil {
+		panic(err)
+	}
+	return SSTableWriter{
+		writer: bufio.NewWriter(fd),
 	}
 }
 
@@ -64,7 +78,7 @@ func (reader *SSTableReader) peekNextId() ([]byte, error) {
 func (reader *SSTableReader) readNextEntry() (MemtableEntry, error) {
 	idSize := make([]byte, 1)
 
-	for {
+	for { //If the size is 0, it's padding in a block. Keep looking until a new block or EOF
 		_, err := reader.reader.Read(idSize)
 
 		if err != nil {
@@ -127,9 +141,6 @@ func compactSSTables(table1_path string, table2_path string, output_path string)
 	id1, err1 := reader1.peekNextId()
 	id2, err2 := reader2.peekNextId()
 
-	fmt.Printf("id1: %i\n", id1)
-	fmt.Printf("id2: %i\n", id2)
-
 	if checkEOF(err1) || checkEOF(err2) {
 		return
 	}
@@ -171,7 +182,8 @@ func compactSSTables(table1_path string, table2_path string, output_path string)
 	}
 }
 
-func createSSTableFromMemtable(memtable *Memtable, blockSize int) (*SSTable, error) {
+func (writer *SSTableWriter) writeFromMemtable(memtable *Memtable) error {
+	blockSize := 100
 	currentBlock := []byte{}
 	blocks := []byte{}
 
@@ -183,7 +195,7 @@ func createSSTableFromMemtable(memtable *Memtable, blockSize int) (*SSTable, err
 		if size > (blockSize - len(currentBlock)) {
 			if size > blockSize {
 				//Will never fit
-				return &SSTable{}, errors.New("entry larger than max block size")
+				return errors.New("entry larger than max block size")
 			}
 			//Pad remainder of block
 			padding := blockSize - len(currentBlock)
@@ -201,62 +213,26 @@ func createSSTableFromMemtable(memtable *Memtable, blockSize int) (*SSTable, err
 	currentBlock = append(currentBlock, make([]byte, padding)...)
 	blocks = append(blocks, currentBlock...)
 
-	return &SSTable{Blocks: &blocks}, nil
+	_, err := writer.writer.Write(blocks)
+	if err != nil {
+		return err
+	}
+	writer.writer.Flush()
+
+	return nil
 }
 
-func (table *SSTable) bytes() []byte {
-	return *table.Blocks
-}
-
-func searchInSSTable(reader *bufio.Reader, searchId []byte) (*MemtableEntry, error) {
+func scanSSTable(path string, searchId []byte) (*MemtableEntry, error) {
+	reader := newSSTableReader(path)
 	for {
-		idSize := make([]byte, 1)
-		_, err := reader.Read(idSize)
-
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				return nil, nil
-			}
-			return &MemtableEntry{}, err
+		entry, err := reader.readNextEntry()
+		if checkEOF(err) {
+			return nil, nil
 		}
-
-		if idSize[0] == byte(0) {
+		if !bytes.Equal(entry.id, searchId) {
 			continue
 		}
 
-		id := make([]byte, int(idSize[0]))
-		contentLength := make([]byte, 1)
-
-		_, err = reader.Read(id)
-		if err != nil {
-			return &MemtableEntry{}, err
-		}
-
-		_, err = reader.Read(contentLength)
-		if err != nil {
-			return &MemtableEntry{}, err
-		}
-
-		if !bytes.Equal(id, searchId) {
-			reader.Discard(int(contentLength[0]))
-			continue
-		}
-
-		content := make([]byte, contentLength[0])
-		_, err = reader.Read(content)
-
-		if err != nil {
-			return &MemtableEntry{}, err
-		}
-
-		all := []byte{}
-		all = append(all, idSize...)
-		all = append(all, id...)
-		all = append(all, contentLength...)
-		all = append(all, content...)
-
-		entry := &MemtableEntry{}
-		entry.deserialize(all)
-		return entry, nil
+		return &entry, nil
 	}
 }

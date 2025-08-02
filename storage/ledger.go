@@ -57,17 +57,18 @@ func addFileToLedger(fileName string) {
 	fileLedger.ledgerFile.Sync()
 }
 
-func writeDataFile(table *SSTable) {
+func writeDataFile(memtable *Memtable) {
 	if !fileLedger.loaded {
 		panic("databaseFileStructure is not loaded")
 	}
 
 	fileName := fmt.Sprintf("%v", time.Now().UnixNano())
-
-	err := os.WriteFile(fmt.Sprintf("data/%v", fileName), *table.Blocks, 0644)
-	addFileToLedger(fileName)
+	writer := newSSTableWriter(fmt.Sprintf("./data/%v", fileName))
+	err := writer.writeFromMemtable(memtable)
 
 	if err != nil {
 		panic(err)
 	}
+
+	addFileToLedger(fileName)
 }

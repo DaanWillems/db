@@ -1,9 +1,7 @@
 package storage
 
 import (
-	"bufio"
 	"fmt"
-	"os"
 )
 
 type Config struct {
@@ -48,12 +46,7 @@ func Insert(id int, values []string) {
 	memtable.insert(entry)
 
 	if memtable.entries.Len() >= config.MemtableSize {
-		table, err := createSSTableFromMemtable(&memtable, 100)
-		if err != nil {
-			panic(err)
-		}
-
-		writeDataFile(table)
+		writeDataFile(&memtable)
 
 		memtable = newMemtable() // Reset memtable after flushing
 		resetWAL()               //Discard the WAL
@@ -69,14 +62,7 @@ func Query(id int) ([]byte, error) {
 	}
 
 	for _, path := range getDataIndex() {
-		fd, err := os.Open(fmt.Sprintf("./data/%v", path))
-
-		if err != nil {
-			panic(err)
-		}
-
-		reader := bufio.NewReader(fd)
-		entry, err = searchInSSTable(reader, []byte{byte(id)})
+		entry, err := scanSSTable(fmt.Sprintf("./data/%v", path), []byte{byte(id)})
 
 		if err != nil {
 			panic(err)
