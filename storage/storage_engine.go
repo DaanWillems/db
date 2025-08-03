@@ -1,7 +1,9 @@
 package storage
 
 import (
+	"bufio"
 	"fmt"
+	"os"
 )
 
 type Config struct {
@@ -16,11 +18,16 @@ func InitializeStorageEngine(cfg Config) {
 	loadFileLedger()
 	replayWal("./data/wal")
 	openWAL("./data/wal")
-	compact()
+	// compact()
 	config = cfg
 }
 
-func compact() {
+func Close() {
+	closeWAL()
+	closeLedger()
+}
+
+func Compact() {
 	index := getDataIndex()
 
 	if len(index) < 2 {
@@ -62,7 +69,10 @@ func Query(id int) ([]byte, error) {
 	}
 
 	for _, path := range getDataIndex() {
-		entry, err := scanSSTable(fmt.Sprintf("./data/%v", path), []byte{byte(id)})
+		fd, err := os.Open(fmt.Sprintf("./data/%v", path))
+		panicIfErr(err)
+
+		entry, err := scanSSTable(bufio.NewReader((fd)), []byte{byte(id)})
 
 		if err != nil {
 			panic(err)

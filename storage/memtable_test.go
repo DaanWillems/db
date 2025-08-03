@@ -7,7 +7,7 @@ import (
 )
 
 func TestMemtableOrderStr(t *testing.T) {
-	memtable := NewMemtable()
+	memtable := newMemtable()
 
 	memtable.insertRaw([]byte("abc"), [][]byte{[]byte("a")})
 	memtable.insertRaw([]byte("bdq"), [][]byte{[]byte("a")})
@@ -28,7 +28,7 @@ func TestMemtableOrderStr(t *testing.T) {
 }
 
 func TestMemtableOrderInt(t *testing.T) {
-	memtable := NewMemtable()
+	memtable := newMemtable()
 
 	memtable.insertRaw([]byte{byte(1)}, [][]byte{[]byte("a")})
 	memtable.insertRaw([]byte{byte(3)}, [][]byte{[]byte("a")})

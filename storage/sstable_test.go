@@ -8,20 +8,21 @@ import (
 )
 
 func TestSSTable(t *testing.T) {
-	memtable := NewMemtable()
+	memtable := newMemtable()
 
 	for id := range 10 {
 		memtable.insertRaw([]byte{byte(id)}, [][]byte{{byte(id)}, []byte("b")})
 	}
 
-	table, _ := createSSTableFromMemtable(&memtable, 10)
+	buffer := bytes.Buffer{}
+	writer := newSSTableWriter(bufio.NewWriter(&buffer))
 
-	tableBytes := table.bytes()
+	writer.writeFromMemtable(&memtable)
 
-	reader := bufio.NewReader(bytes.NewReader(tableBytes))
+	reader := bufio.NewReader(&buffer)
 
 	for id := range 10 {
-		result, _ := searchInSSTable(reader, []byte{byte(id)})
+		result, _ := scanSSTable(reader, []byte{byte(id)})
 
 		entry := MemtableEntry{
 			[]byte{byte(id)},

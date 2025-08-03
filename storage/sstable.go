@@ -21,23 +21,15 @@ type SSTableReader struct {
 	reader *bufio.Reader
 }
 
-func newSSTableReader(path string) SSTableReader {
-	fd, err := os.Open(path)
-	if err != nil {
-		panic(err)
-	}
+func newSSTableReader(buffer *bufio.Reader) SSTableReader {
 	return SSTableReader{
-		reader: bufio.NewReader(fd),
+		reader: buffer,
 	}
 }
 
-func newSSTableWriter(path string) SSTableWriter {
-	fd, err := os.Create(path)
-	if err != nil {
-		panic(err)
-	}
+func newSSTableWriter(buffer *bufio.Writer) SSTableWriter {
 	return SSTableWriter{
-		writer: bufio.NewWriter(fd),
+		writer: buffer,
 	}
 }
 
@@ -132,8 +124,16 @@ func panicIfErr(err error) {
 }
 
 func compactSSTables(table1_path string, table2_path string, output_path string) {
-	reader1 := newSSTableReader(table1_path)
-	reader2 := newSSTableReader(table2_path)
+	fd1, err := os.Open(table1_path)
+	panicIfErr(err)
+	fd2, err := os.Open(table2_path)
+	panicIfErr(err)
+
+	buffer1 := bufio.NewReader(fd1)
+	buffer2 := bufio.NewReader(fd2)
+
+	reader1 := newSSTableReader(buffer1)
+	reader2 := newSSTableReader(buffer2)
 
 	var id1 []byte
 	var id2 []byte
@@ -155,7 +155,7 @@ func compactSSTables(table1_path string, table2_path string, output_path string)
 			fmt.Printf("Reading from file2, got entry: %v\n", entry)
 
 			id2, err = reader2.peekNextId()
-			fmt.Printf("id2: %i\n", id2)
+			fmt.Printf("id2: %v\n", id2)
 			if checkEOF(err) {
 				remainder = &reader1
 				break
@@ -165,7 +165,7 @@ func compactSSTables(table1_path string, table2_path string, output_path string)
 			fmt.Printf("Reading from file1, got entry: %v\n", entry)
 			panicIfErr(err)
 			id1, err = reader1.peekNextId()
-			fmt.Printf("id1: %i\n", id2)
+			fmt.Printf("id1: %v\n", id2)
 			if checkEOF(err) {
 				remainder = &reader2
 				break
@@ -222,8 +222,8 @@ func (writer *SSTableWriter) writeFromMemtable(memtable *Memtable) error {
 	return nil
 }
 
-func scanSSTable(path string, searchId []byte) (*MemtableEntry, error) {
-	reader := newSSTableReader(path)
+func scanSSTable(buffer *bufio.Reader, searchId []byte) (*MemtableEntry, error) {
+	reader := newSSTableReader(buffer)
 	for {
 		entry, err := reader.readNextEntry()
 		if checkEOF(err) {

@@ -63,7 +63,8 @@ func writeDataFile(memtable *Memtable) {
 	}
 
 	fileName := fmt.Sprintf("%v", time.Now().UnixNano())
-	writer := newSSTableWriter(fmt.Sprintf("./data/%v", fileName))
+	fd, _ := os.Create(fmt.Sprintf("./data/%v", fileName))
+	writer := newSSTableWriter(bufio.NewWriter(fd))
 	err := writer.writeFromMemtable(memtable)
 
 	if err != nil {
