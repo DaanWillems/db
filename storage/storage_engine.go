@@ -18,7 +18,7 @@ func InitializeStorageEngine(cfg Config) {
 	loadFileLedger()
 	replayWal("./data/wal")
 	openWAL("./data/wal")
-	// compact()
+	compact()
 	config = cfg
 }
 
@@ -27,7 +27,7 @@ func Close() {
 	closeLedger()
 }
 
-func Compact() {
+func compact() {
 	index := getDataIndex()
 
 	if len(index) < 2 {

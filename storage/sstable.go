@@ -4,8 +4,8 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
+	"log"
 	"os"
 )
 
@@ -14,7 +14,8 @@ type SSTable struct {
 }
 
 type SSTableWriter struct {
-	writer *bufio.Writer
+	buffer          *bufio.Writer
+	currentBlockLen int
 }
 
 type SSTableReader struct {
@@ -29,7 +30,8 @@ func newSSTableReader(buffer *bufio.Reader) SSTableReader {
 
 func newSSTableWriter(buffer *bufio.Writer) SSTableWriter {
 	return SSTableWriter{
-		writer: buffer,
+		buffer:          buffer,
+		currentBlockLen: 0,
 	}
 }
 
@@ -128,12 +130,16 @@ func compactSSTables(table1_path string, table2_path string, output_path string)
 	panicIfErr(err)
 	fd2, err := os.Open(table2_path)
 	panicIfErr(err)
+	fd3, err := os.OpenFile(output_path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 644)
+	panicIfErr(err)
 
 	buffer1 := bufio.NewReader(fd1)
 	buffer2 := bufio.NewReader(fd2)
+	buffer3 := bufio.NewWriter(fd3)
 
 	reader1 := newSSTableReader(buffer1)
 	reader2 := newSSTableReader(buffer2)
+	writer := newSSTableWriter(buffer3)
 
 	var id1 []byte
 	var id2 []byte
@@ -152,20 +158,17 @@ func compactSSTables(table1_path string, table2_path string, output_path string)
 		if bytes.Compare(id1, id2) == 1 {
 			entry, err := reader2.readNextEntry()
 			panicIfErr(err)
-			fmt.Printf("Reading from file2, got entry: %v\n", entry)
-
+			writer.writeSingleEntry(&entry)
 			id2, err = reader2.peekNextId()
-			fmt.Printf("id2: %v\n", id2)
 			if checkEOF(err) {
 				remainder = &reader1
 				break
 			}
 		} else {
 			entry, err := reader1.readNextEntry()
-			fmt.Printf("Reading from file1, got entry: %v\n", entry)
 			panicIfErr(err)
+			writer.writeSingleEntry(&entry)
 			id1, err = reader1.peekNextId()
-			fmt.Printf("id1: %v\n", id2)
 			if checkEOF(err) {
 				remainder = &reader2
 				break
@@ -178,8 +181,36 @@ func compactSSTables(table1_path string, table2_path string, output_path string)
 		if checkEOF(err) {
 			break
 		}
-		fmt.Printf("Reading from remainder, got entry: %v\n", entry)
+
+		writer.writeSingleEntry(&entry)
 	}
+}
+
+func (writer *SSTableWriter) writeSingleEntry(entry *MemtableEntry) error {
+	blockSize := 100
+	size, serialized_entry := entry.serialize()
+	log.Println("Writing single entry")
+	//Check to see if there is enough place in the block to add the entry
+	if size > (blockSize - writer.currentBlockLen) {
+		if size > blockSize {
+			//Will never fit
+			return errors.New("entry larger than max block size")
+		}
+
+		log.Println("Padding block..")
+		//Pad remainder of block
+		padding := blockSize - writer.currentBlockLen
+		writer.buffer.Write(make([]byte, padding))
+
+		writer.currentBlockLen = 0
+	}
+
+	log.Println("Writing entry..")
+	writer.currentBlockLen += size
+	_, err := writer.buffer.Write(serialized_entry)
+	panicIfErr(err)
+	writer.buffer.Flush()
+	return nil
 }
 
 func (writer *SSTableWriter) writeFromMemtable(memtable *Memtable) error {
@@ -213,11 +244,11 @@ func (writer *SSTableWriter) writeFromMemtable(memtable *Memtable) error {
 	currentBlock = append(currentBlock, make([]byte, padding)...)
 	blocks = append(blocks, currentBlock...)
 
-	_, err := writer.writer.Write(blocks)
+	_, err := writer.buffer.Write(blocks)
 	if err != nil {
 		return err
 	}
-	writer.writer.Flush()
+	writer.buffer.Flush()
 
 	return nil
 }

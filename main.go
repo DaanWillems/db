@@ -15,12 +15,12 @@ func main() {
 	defer pprof.StopCPUProfile()
 
 	storage.InitializeStorageEngine(storage.Config{
-		MemtableSize: 10000,
+		MemtableSize: 100,
 	})
 
-	// for i := range 250000 {
-	// 	storage.Insert(i, []string{fmt.Sprintf("%v", i)})
-	// }
+	for i := range 250 {
+		storage.Insert(i, []string{fmt.Sprintf("%v", i)})
+	}
 
 	result, err := storage.Query(1)
 
