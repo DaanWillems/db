@@ -24,7 +24,7 @@ func TestSSTable(t *testing.T) {
 	for id := range 1000 {
 		result, _ := scanSSTable(reader, []byte{byte(id)})
 
-		entry := MemtableEntry{
+		entry := Entry{
 			[]byte{byte(id)},
 			[][]byte{{byte(id)}, []byte("b")},
 			false,

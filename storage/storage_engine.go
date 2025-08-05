@@ -49,7 +49,7 @@ func Compact() {
 }
 
 func Insert(id int, values [][]byte) {
-	entry := MemtableEntry{
+	entry := Entry{
 		id:      []byte{byte(id)},
 		values:  values,
 		deleted: false,

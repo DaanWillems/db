@@ -8,13 +8,13 @@ import (
 	"io"
 )
 
-type MemtableEntry struct {
+type Entry struct {
 	id      []byte
 	values  [][]byte
 	deleted bool
 }
 
-func (entry *MemtableEntry) deserialize(entryBytes []byte) error {
+func (entry *Entry) deserialize(entryBytes []byte) error {
 	buf := bytes.NewBuffer(entryBytes)
 
 	idLen, err := mustReadByte(buf)
@@ -59,7 +59,7 @@ func (entry *MemtableEntry) deserialize(entryBytes []byte) error {
 	return nil
 }
 
-func (entry *MemtableEntry) serialize() (int, []byte) {
+func (entry *Entry) serialize() (int, []byte) {
 	var header bytes.Buffer
 	var content bytes.Buffer
 
@@ -96,10 +96,10 @@ func newMemtable() Memtable {
 	}
 }
 
-func (m *Memtable) Get(id []byte) *MemtableEntry {
+func (m *Memtable) Get(id []byte) *Entry {
 	for e := m.entries.Front(); e != nil; e = e.Next() {
-		if bytes.Equal(id, e.Value.(MemtableEntry).id) {
-			entry := e.Value.(MemtableEntry)
+		if bytes.Equal(id, e.Value.(Entry).id) {
+			entry := e.Value.(Entry)
 			return &entry
 		}
 	}
@@ -108,24 +108,24 @@ func (m *Memtable) Get(id []byte) *MemtableEntry {
 
 func (m *Memtable) update(id []byte, values [][]byte) {
 
-	entry := MemtableEntry{
+	entry := Entry{
 		id:      id,
 		values:  values,
 		deleted: false,
 	}
 
 	for e := m.entries.Front(); e != nil; e = e.Next() {
-		if bytes.Equal(e.Value.(MemtableEntry).id, id) {
+		if bytes.Equal(e.Value.(Entry).id, id) {
 			e.Value = entry
 			return
 		}
 	}
 }
 
-func (m *Memtable) insert(entry MemtableEntry) {
+func (m *Memtable) insert(entry Entry) {
 	for e := m.entries.Front(); e != nil; e = e.Next() {
 		next := e.Next()
-		if next != nil && bytes.Compare(entry.id, next.Value.(MemtableEntry).id) == -1 {
+		if next != nil && bytes.Compare(entry.id, next.Value.(Entry).id) == -1 {
 			m.entries.InsertBefore(entry, next)
 			return
 		}
@@ -135,7 +135,7 @@ func (m *Memtable) insert(entry MemtableEntry) {
 }
 
 func (m Memtable) insertRaw(id []byte, values [][]byte) {
-	entry := MemtableEntry{
+	entry := Entry{
 		id:      id,
 		values:  values,
 		deleted: false,

@@ -62,14 +62,14 @@ func (reader *SSTableReader) peekNextId() ([]byte, error) {
 	return id, nil
 }
 
-func (reader *SSTableReader) readNextEntry() (MemtableEntry, error) {
+func (reader *SSTableReader) readNextEntry() (Entry, error) {
 	idSize := make([]byte, 1)
 
 	for { //If the size is 0, it's padding in a block. Keep looking until a new block or EOF
 		_, err := reader.reader.Read(idSize)
 
 		if err != nil {
-			return MemtableEntry{}, err
+			return Entry{}, err
 		}
 
 		if idSize[0] != byte(0) {
@@ -82,19 +82,19 @@ func (reader *SSTableReader) readNextEntry() (MemtableEntry, error) {
 
 	_, err := reader.reader.Read(id)
 	if err != nil {
-		return MemtableEntry{}, err
+		return Entry{}, err
 	}
 
 	_, err = reader.reader.Read(contentLength)
 	if err != nil {
-		return MemtableEntry{}, err
+		return Entry{}, err
 	}
 
 	content := make([]byte, contentLength[0])
 	_, err = reader.reader.Read(content)
 
 	if err != nil {
-		return MemtableEntry{}, err
+		return Entry{}, err
 	}
 
 	all := []byte{}
@@ -103,12 +103,12 @@ func (reader *SSTableReader) readNextEntry() (MemtableEntry, error) {
 	all = append(all, contentLength...)
 	all = append(all, content...)
 
-	entry := MemtableEntry{}
+	entry := Entry{}
 	entry.deserialize(all)
 	return entry, nil
 }
 
-func (writer *SSTableWriter) writeSingleEntry(entry *MemtableEntry) error {
+func (writer *SSTableWriter) writeSingleEntry(entry *Entry) error {
 	blockSize := 100
 	size, serialized_entry := entry.serialize()
 	//Check to see if there is enough place in the block to add the entry
@@ -134,13 +134,13 @@ func (writer *SSTableWriter) writeSingleEntry(entry *MemtableEntry) error {
 
 func (writer *SSTableWriter) writeFromMemtable(memtable *Memtable) error {
 	for e := memtable.entries.Front(); e != nil; e = e.Next() {
-		entry := e.Value.(MemtableEntry)
+		entry := e.Value.(Entry)
 		writer.writeSingleEntry(&entry)
 	}
 	return nil
 }
 
-func scanSSTable(buffer *bufio.Reader, searchId []byte) (*MemtableEntry, error) {
+func scanSSTable(buffer *bufio.Reader, searchId []byte) (*Entry, error) {
 	reader := newSSTableReader(buffer)
 	for {
 		entry, err := reader.readNextEntry()

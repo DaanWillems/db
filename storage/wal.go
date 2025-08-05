@@ -38,7 +38,7 @@ func closeWAL() {
 	}
 }
 
-func writeEntryToWal(entry MemtableEntry) {
+func writeEntryToWal(entry Entry) {
 	len, content := entry.serialize()
 
 	wal_writer.Write([]byte{byte(len)})
@@ -76,7 +76,7 @@ func replayWal(_wal_path string) {
 			panic(err)
 		}
 
-		entry := &MemtableEntry{}
+		entry := &Entry{}
 		entry.deserialize(content)
 
 		memtable.insert(*entry)
