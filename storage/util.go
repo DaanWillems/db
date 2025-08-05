@@ -1,5 +1,11 @@
 package storage
 
+import (
+	"errors"
+	"io"
+	"log"
+)
+
 type DbType int
 
 const (
@@ -47,4 +53,20 @@ func (b DbBool) Bytes() []byte {
 		return []byte{byte(1)}
 	}
 	return []byte{byte(0)}
+}
+
+func checkEOF(err error) bool {
+	return errors.Is(err, io.EOF)
+}
+
+func panicIfErr(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
+func logFatal(err error) {
+	if err != nil {
+		log.Fatal(err)
+	}
 }

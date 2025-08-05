@@ -4,18 +4,11 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
-	"io"
-	"log"
-	"os"
 )
-
-type SSTable struct {
-	Blocks *[]byte
-}
 
 type SSTableWriter struct {
 	buffer          *bufio.Writer
-	currentBlockLen int
+	currentBlockLen int //The length of the current block we're writing to
 }
 
 type SSTableReader struct {
@@ -115,81 +108,9 @@ func (reader *SSTableReader) readNextEntry() (MemtableEntry, error) {
 	return entry, nil
 }
 
-func checkEOF(err error) bool {
-	return errors.Is(err, io.EOF)
-}
-
-func panicIfErr(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
-
-func compactSSTables(table1_path string, table2_path string, output_path string) {
-	fd1, err := os.Open(table1_path)
-	panicIfErr(err)
-	fd2, err := os.Open(table2_path)
-	panicIfErr(err)
-	fd3, err := os.OpenFile(output_path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 644)
-	panicIfErr(err)
-
-	buffer1 := bufio.NewReader(fd1)
-	buffer2 := bufio.NewReader(fd2)
-	buffer3 := bufio.NewWriter(fd3)
-
-	reader1 := newSSTableReader(buffer1)
-	reader2 := newSSTableReader(buffer2)
-	writer := newSSTableWriter(buffer3)
-
-	var id1 []byte
-	var id2 []byte
-
-	id1, err1 := reader1.peekNextId()
-	id2, err2 := reader2.peekNextId()
-
-	if checkEOF(err1) || checkEOF(err2) {
-		return
-	}
-
-	var remainder *SSTableReader
-
-	for {
-		//id1 is larger than id2
-		if bytes.Compare(id1, id2) == 1 {
-			entry, err := reader2.readNextEntry()
-			panicIfErr(err)
-			writer.writeSingleEntry(&entry)
-			id2, err = reader2.peekNextId()
-			if checkEOF(err) {
-				remainder = &reader1
-				break
-			}
-		} else {
-			entry, err := reader1.readNextEntry()
-			panicIfErr(err)
-			writer.writeSingleEntry(&entry)
-			id1, err = reader1.peekNextId()
-			if checkEOF(err) {
-				remainder = &reader2
-				break
-			}
-		}
-	}
-
-	for {
-		entry, err := remainder.readNextEntry()
-		if checkEOF(err) {
-			break
-		}
-
-		writer.writeSingleEntry(&entry)
-	}
-}
-
 func (writer *SSTableWriter) writeSingleEntry(entry *MemtableEntry) error {
 	blockSize := 100
 	size, serialized_entry := entry.serialize()
-	log.Println("Writing single entry")
 	//Check to see if there is enough place in the block to add the entry
 	if size > (blockSize - writer.currentBlockLen) {
 		if size > blockSize {
@@ -197,7 +118,6 @@ func (writer *SSTableWriter) writeSingleEntry(entry *MemtableEntry) error {
 			return errors.New("entry larger than max block size")
 		}
 
-		log.Println("Padding block..")
 		//Pad remainder of block
 		padding := blockSize - writer.currentBlockLen
 		writer.buffer.Write(make([]byte, padding))
@@ -205,7 +125,6 @@ func (writer *SSTableWriter) writeSingleEntry(entry *MemtableEntry) error {
 		writer.currentBlockLen = 0
 	}
 
-	log.Println("Writing entry..")
 	writer.currentBlockLen += size
 	_, err := writer.buffer.Write(serialized_entry)
 	panicIfErr(err)
@@ -214,42 +133,10 @@ func (writer *SSTableWriter) writeSingleEntry(entry *MemtableEntry) error {
 }
 
 func (writer *SSTableWriter) writeFromMemtable(memtable *Memtable) error {
-	blockSize := 100
-	currentBlock := []byte{}
-	blocks := []byte{}
-
 	for e := memtable.entries.Front(); e != nil; e = e.Next() {
 		entry := e.Value.(MemtableEntry)
-
-		size, serialized_entry := entry.serialize()
-		//Check to see if there is enough place in the block to add the entry
-		if size > (blockSize - len(currentBlock)) {
-			if size > blockSize {
-				//Will never fit
-				return errors.New("entry larger than max block size")
-			}
-			//Pad remainder of block
-			padding := blockSize - len(currentBlock)
-			currentBlock = append(currentBlock, make([]byte, padding)...)
-			//Prepare new block
-			blocks = append(blocks, currentBlock...)
-			currentBlock = []byte{}
-		}
-
-		currentBlock = append(currentBlock, serialized_entry...)
+		writer.writeSingleEntry(&entry)
 	}
-
-	//Pad remainder of block
-	padding := blockSize - len(currentBlock)
-	currentBlock = append(currentBlock, make([]byte, padding)...)
-	blocks = append(blocks, currentBlock...)
-
-	_, err := writer.buffer.Write(blocks)
-	if err != nil {
-		return err
-	}
-	writer.buffer.Flush()
-
 	return nil
 }
 

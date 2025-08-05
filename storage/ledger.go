@@ -23,8 +23,8 @@ func closeLedger() {
 	fileLedger.ledgerFile.Close()
 }
 
-func loadFileLedger() {
-	indexFile, err := os.OpenFile("./data/ledger", os.O_RDWR|os.O_CREATE, 0644)
+func loadFileLedger(path string) {
+	indexFile, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {
 		panic(err)
 	}

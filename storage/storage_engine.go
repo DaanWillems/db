@@ -7,7 +7,8 @@ import (
 )
 
 type Config struct {
-	MemtableSize int //Threshold of entries before flushing to disk
+	MemtableSize  int //Threshold of entries before flushing to disk
+	DataDirectory string
 }
 
 var memtable Memtable
@@ -15,10 +16,9 @@ var config Config
 
 func InitializeStorageEngine(cfg Config) {
 	memtable = newMemtable()
-	loadFileLedger()
-	replayWal("./data/wal")
-	openWAL("./data/wal")
-	compact()
+	loadFileLedger(fmt.Sprintf("./%v/ledger", cfg.DataDirectory))
+	replayWal(fmt.Sprintf("./%v/wal", cfg.DataDirectory))
+	openWAL(fmt.Sprintf("./%v/wal", cfg.DataDirectory))
 	config = cfg
 }
 
@@ -27,14 +27,14 @@ func Close() {
 	closeLedger()
 }
 
-func compact() {
+func Compact() {
 	index := getDataIndex()
 
 	if len(index) < 2 {
 		return
 	}
 
-	compactSSTables(fmt.Sprintf("./data/%v", index[0]), fmt.Sprintf("./data/%v", index[1]), "./test")
+	compactNSSTables([]string{fmt.Sprintf("./data/%v", index[0]), fmt.Sprintf("./data/%v", index[1])}, "./test")
 }
 
 func Insert(id int, values []string) {
@@ -54,7 +54,6 @@ func Insert(id int, values []string) {
 
 	if memtable.entries.Len() >= config.MemtableSize {
 		writeDataFile(&memtable)
-
 		memtable = newMemtable() // Reset memtable after flushing
 		resetWAL()               //Discard the WAL
 	}
