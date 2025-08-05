@@ -10,7 +10,7 @@ import (
 func TestSSTable(t *testing.T) {
 	memtable := newMemtable()
 
-	for id := range 10 {
+	for id := range 1000 {
 		memtable.insertRaw([]byte{byte(id)}, [][]byte{{byte(id)}, []byte("b")})
 	}
 
@@ -21,7 +21,7 @@ func TestSSTable(t *testing.T) {
 
 	reader := bufio.NewReader(&buffer)
 
-	for id := range 10 {
+	for id := range 1000 {
 		result, _ := scanSSTable(reader, []byte{byte(id)})
 
 		entry := MemtableEntry{

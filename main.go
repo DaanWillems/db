@@ -19,10 +19,13 @@ func main() {
 		DataDirectory: "data",
 	})
 
-	for i := range 2500 {
-		storage.Insert(i, []string{fmt.Sprintf("%v", i)})
+	for i := range 1000 {
+		storage.Insert(i, [][]byte{[]byte{byte(i)}})
 	}
+	result, _ := storage.Query(999)
+	fmt.Printf("%08b\n", 999)
+	fmt.Printf("%08b\n", result)
 
-	storage.Compact()
+	//storage.Compact()
 	storage.Close()
 }

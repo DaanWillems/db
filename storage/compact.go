@@ -3,61 +3,72 @@ package storage
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"os"
 )
 
-func getSmallestKey(initial_min []byte, readers map[string]*SSTableReader) (string, *SSTableReader, []byte) {
-	min := initial_min
+func getSmallestKey(readers []*SSTableReader) (*SSTableReader, []*SSTableReader) {
+	var min []byte
 	var smallestReader *SSTableReader
-	var smallestPath string
+	emptyReaders := []*SSTableReader{}
 
 	//Get reader with smallest key
 	for path, reader := range readers {
-		id, _ := reader.peekNextId()
-		if bytes.Compare(id, min) == -1 {
+		id, err := reader.peekNextId()
+		if checkEOF(err) {
+			emptyReaders = append(emptyReaders, reader)
+			fmt.Printf("%v empty \n", path)
+			continue
+		}
+
+		if min == nil {
 			min = id
 			smallestReader = reader
-			smallestPath = path
+		} else if bytes.Compare(id, min) == -1 {
+			min = id
+			smallestReader = reader
 		}
 	}
 
-	return smallestPath, smallestReader, min
+	fmt.Printf("found min %v\n", min)
+	return smallestReader, emptyReaders
 }
 
-func compactNSSTables(input_paths []string, output_path string) {
-	fd_writer, err := os.OpenFile(output_path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 644)
-	panicIfErr(err)
-	writer_buffer := bufio.NewWriter(fd_writer)
-	writer := newSSTableWriter(writer_buffer)
-
-	//Create readers
-	inputs := map[string]*SSTableReader{}
-
-	var min []byte
-	var currentPath string
-	var currentReader *SSTableReader
-
-	for _, path := range input_paths {
-		fd, err := os.Open(path)
-		logFatal(err)
-		reader := newSSTableReader(bufio.NewReader(fd))
-		inputs[path] = &reader
-		id, _ := inputs[path].peekNextId()
-		if bytes.Compare(id, min) == 1 {
-			min = id
-		}
-	}
-
+func compactNSSTables(inputs []*SSTableReader, output *SSTableWriter) error {
 	for {
-		currentPath, currentReader, min = getSmallestKey(min, inputs)
-
+		currentReader, emptyReaders := getSmallestKey(inputs)
 		entry, err := currentReader.readNextEntry()
-		if checkEOF(err) {
-			//Remove from map
-			delete(inputs, currentPath)
+		if err != nil {
+			return err
+		}
+		output.writeSingleEntry(&entry)
+
+		for index, emptyReader := range emptyReaders {
+			for _, reader := range inputs {
+				if reader == emptyReader {
+					//Remove from map
+					inputs = append(inputs[:index], inputs[index+1:]...)
+				}
+			}
 		}
 
-		writer.writeSingleEntry(&entry)
+		if len(inputs) == 0 {
+			return nil
+		}
+		if len(inputs) == 1 {
+			for _, remainder := range inputs {
+				for {
+					entry, err := remainder.readNextEntry()
+					if checkEOF(err) {
+						return nil
+					}
+					if err != nil {
+						return err
+					}
+					output.writeSingleEntry(&entry)
+				}
+			}
+		}
 	}
 }
 

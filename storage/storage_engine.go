@@ -34,18 +34,24 @@ func Compact() {
 		return
 	}
 
-	compactNSSTables([]string{fmt.Sprintf("./data/%v", index[0]), fmt.Sprintf("./data/%v", index[1])}, "./test")
+	fd1, err := os.Open(fmt.Sprintf("./data/%v", index[0]))
+	panicIfErr(err)
+	fd2, err := os.Open(fmt.Sprintf("./data/%v", index[1]))
+	panicIfErr(err)
+	fd3, err := os.OpenFile("test", os.O_CREATE|os.O_RDWR, 0644)
+	panicIfErr(err)
+
+	b1 := newSSTableReader(bufio.NewReader(fd1))
+	b2 := newSSTableReader(bufio.NewReader(fd2))
+	b3 := newSSTableWriter(bufio.NewWriter(fd3))
+
+	compactNSSTables([]*SSTableReader{&b1, &b2}, &b3)
 }
 
-func Insert(id int, values []string) {
-	byteValues := [][]byte{}
-	for _, v := range values {
-		byteValues = append(byteValues, []byte(v))
-	}
-
+func Insert(id int, values [][]byte) {
 	entry := MemtableEntry{
 		id:      []byte{byte(id)},
-		values:  byteValues,
+		values:  values,
 		deleted: false,
 	}
 
