@@ -28,7 +28,7 @@ func newSSTableReader(buffer *bufio.Reader) SSTableReader {
 func newSSTableReaderFromPath(path string) SSTableReader {
 	fd, err := os.Open(path)
 	panicIfErr(err)
-	return newSSTableReader(bufio.NewReader(fd))
+	return newSSTableReader(bufio.NewReaderSize(fd, 1024*1024))
 }
 
 func newSSTableWriter(buffer *bufio.Writer) SSTableWriter {
@@ -132,14 +132,11 @@ func (reader *SSTableReader) readNextEntry() (Entry, error) {
 
 	entry := Entry{}
 	entry.deserialize(all)
-	// log.Printf("Read raw bytes: %s", hex.EncodeToString(all))
-	// log.Printf("Parsed - ID: %v, Value: %v", entry.id, entry.value)
-	// fmt.Printf("Last bytes %v\n", hex.EncodeToString(lastN(reader.bytes_read, 22)))
 	return entry, nil
 }
 
 func (writer *SSTableWriter) writeSingleEntry(entry *Entry) error {
-	blockSize := 15
+	blockSize := 100
 
 	size, serialized_entry := entry.serialize()
 	//Check to see if there is enough place in the block to add the entry
@@ -160,7 +157,6 @@ func (writer *SSTableWriter) writeSingleEntry(entry *Entry) error {
 	}
 
 	writer.currentBlockLen += size
-	// log.Printf("About to write entry %v: %s", entry.id, hex.EncodeToString(serialized_entry))
 	_, err := writer.buffer.Write(serialized_entry)
 	panicIfErr(err)
 	writer.buffer.Flush()

@@ -13,14 +13,9 @@ func TestSSTable(t *testing.T) {
 		memtable.insertRaw(intToBytes(id), intToBytes(id))
 	}
 
-	// buffer := bytes.Buffer{}
-	// writer := newSSTableWriter(bufio.NewWriter(&buffer))
 	fd, writer := newSSTableWriterFromPath("abc.db")
 	writer.writeFromMemtable(&memtable)
 	fd.Close()
-	// writer.writeFromMemtable(&memtable)
-
-	// reader := bufio.NewReader(&buffer)
 
 	for id := range 3000 {
 		reader2 := newSSTableReaderFromPath("abc.db")
