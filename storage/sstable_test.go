@@ -16,10 +16,10 @@ func TestSSTable(t *testing.T) {
 
 	// buffer := bytes.Buffer{}
 	// writer := newSSTableWriter(bufio.NewWriter(&buffer))
-	// writer := newSSTableWriterFromPath("abc")
+	writer := newSSTableWriterFromPath("abc")
 
 	// writer.writeFromMemtable(&memtable)
-	// writer.writeFromMemtable(&memtable)
+	writer.writeFromMemtable(&memtable)
 
 	// reader := bufio.NewReader(&buffer)
 

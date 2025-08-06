@@ -3,8 +3,10 @@ package storage
 import (
 	"bufio"
 	"bytes"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 )
 
@@ -125,6 +127,7 @@ func (reader *SSTableReader) readNextEntry() (Entry, error) {
 	all = append(all, valueLength...)
 	all = append(all, value...)
 
+	log.Printf("Just parsed entry: %v", hex.EncodeToString(all))
 	entry := Entry{}
 	entry.deserialize(all)
 	return entry, nil
@@ -182,7 +185,6 @@ func scanSSTable(buffer *bufio.Reader, searchId []byte) (*Entry, error) {
 		if !bytes.Equal(entry.id, searchId) {
 			continue
 		}
-
 		return &entry, nil
 	}
 }
