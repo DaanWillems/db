@@ -1,7 +1,8 @@
 package storage
 
 import (
-	"log"
+	"bufio"
+	"bytes"
 	"reflect"
 	"testing"
 )
@@ -12,15 +13,14 @@ func TestSSTable(t *testing.T) {
 	for id := range 3000 {
 		memtable.insertRaw(intToBytes(id), intToBytes(id))
 	}
-
-	fd, writer := newSSTableWriterFromPath("abc.db")
+	buffer := bytes.Buffer{}
+	writer := newSSTableWriter(bufio.NewWriter(&buffer))
 	writer.writeFromMemtable(&memtable)
-	fd.Close()
+
+	reader := bufio.NewReaderSize(&buffer, 1024*1024)
 
 	for id := range 3000 {
-		reader2 := newSSTableReaderFromPath("abc.db")
-		log.Printf("Starting %v\n", id)
-		result, _ := scanSSTable(reader2.reader, intToBytes(id))
+		result, _ := scanSSTable(reader, intToBytes(id))
 
 		entry := Entry{
 			intToBytes(id),
@@ -32,6 +32,5 @@ func TestSSTable(t *testing.T) {
 			t.Errorf("Result does not match query. \nExpected: \n%v\n Got:\n %v", entry, result)
 			return
 		}
-		log.Printf("Finished %v\n", id)
 	}
 }
