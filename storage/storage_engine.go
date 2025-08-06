@@ -7,7 +7,8 @@ import (
 )
 
 type Config struct {
-	MemtableSize int //Threshold of entries before flushing to disk
+	MemtableSize  int //Threshold of entries before flushing to disk
+	DataDirectory string
 }
 
 var memtable Memtable
@@ -15,21 +16,42 @@ var config Config
 
 func InitializeStorageEngine(cfg Config) {
 	memtable = newMemtable()
-	loadFileLedger()
-	replayWal("./data/wal")
-	openWAL("./data/wal")
+	loadFileLedger(fmt.Sprintf("./%v/ledger", cfg.DataDirectory))
+	replayWal(fmt.Sprintf("./%v/wal", cfg.DataDirectory))
+	openWAL(fmt.Sprintf("./%v/wal", cfg.DataDirectory))
 	config = cfg
 }
 
-func Insert(id int, values []string) {
-	byteValues := [][]byte{}
-	for _, v := range values {
-		byteValues = append(byteValues, []byte(v))
+func Close() {
+	closeWAL()
+	closeLedger()
+}
+
+func Compact() {
+	index := getDataIndex()
+
+	if len(index) < 2 {
+		return
 	}
 
-	entry := MemtableEntry{
+	fd1, err := os.Open(fmt.Sprintf("./data/%v", index[0]))
+	panicIfErr(err)
+	fd2, err := os.Open(fmt.Sprintf("./data/%v", index[1]))
+	panicIfErr(err)
+	fd3, err := os.OpenFile("test", os.O_CREATE|os.O_RDWR, 0644)
+	panicIfErr(err)
+
+	b1 := newSSTableReader(bufio.NewReader(fd1))
+	b2 := newSSTableReader(bufio.NewReader(fd2))
+	b3 := newSSTableWriter(bufio.NewWriter(fd3))
+
+	compactNSSTables([]*SSTableReader{&b1, &b2}, &b3)
+}
+
+func Insert(id int, value []byte) {
+	entry := Entry{
 		id:      []byte{byte(id)},
-		values:  byteValues,
+		value:   value,
 		deleted: false,
 	}
 
@@ -37,13 +59,7 @@ func Insert(id int, values []string) {
 	memtable.insert(entry)
 
 	if memtable.entries.Len() >= config.MemtableSize {
-		table, err := createSSTableFromMemtable(&memtable, 100)
-		if err != nil {
-			panic(err)
-		}
-
-		writeDataFile(table)
-
+		writeDataFile(&memtable)
 		memtable = newMemtable() // Reset memtable after flushing
 		resetWAL()               //Discard the WAL
 	}
@@ -54,18 +70,14 @@ func Query(id int) ([]byte, error) {
 	entry := memtable.Get([]byte{byte(id)})
 
 	if entry != nil {
-		return entry.values[0], nil
+		return entry.value, nil
 	}
 
 	for _, path := range getDataIndex() {
 		fd, err := os.Open(fmt.Sprintf("./data/%v", path))
+		panicIfErr(err)
 
-		if err != nil {
-			panic(err)
-		}
-
-		reader := bufio.NewReader(fd)
-		entry, err = searchInSSTable(reader, []byte{byte(id)})
+		entry, err := scanSSTable(bufio.NewReader((fd)), []byte{byte(id)})
 
 		if err != nil {
 			panic(err)
@@ -75,7 +87,7 @@ func Query(id int) ([]byte, error) {
 			continue
 		}
 
-		return entry.values[0], nil
+		return entry.value, nil
 	}
 
 	return nil, nil

@@ -3,11 +3,13 @@ package storage
 import (
 	"bufio"
 	"io"
+	"log"
 	"os"
 )
 
 var wal_file *os.File
 var wal_path string
+var wal_writer *bufio.Writer
 
 func openWAL(path string) {
 	var err error
@@ -16,6 +18,7 @@ func openWAL(path string) {
 	if err != nil {
 		panic(err)
 	}
+	wal_writer = bufio.NewWriter(wal_file)
 }
 
 func resetWAL() {
@@ -25,13 +28,22 @@ func resetWAL() {
 	if err != nil {
 		panic(err)
 	}
+	wal_writer = bufio.NewWriter(wal_file)
 }
 
-func writeEntryToWal(entry MemtableEntry) {
+func closeWAL() {
+	err := wal_file.Close()
+	if err != nil {
+		log.Println("WAL file was not opened")
+	}
+}
+
+func writeEntryToWal(entry Entry) {
 	len, content := entry.serialize()
-	wal_file.Write([]byte{byte(len)})
-	wal_file.Write(content)
-	wal_file.Sync()
+
+	wal_writer.Write([]byte{byte(len)})
+	wal_writer.Write(content)
+	wal_writer.Flush()
 }
 
 func replayWal(_wal_path string) {
@@ -64,7 +76,7 @@ func replayWal(_wal_path string) {
 			panic(err)
 		}
 
-		entry := &MemtableEntry{}
+		entry := &Entry{}
 		entry.deserialize(content)
 
 		memtable.insert(*entry)

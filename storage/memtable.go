@@ -8,13 +8,13 @@ import (
 	"io"
 )
 
-type MemtableEntry struct {
+type Entry struct {
 	id      []byte
-	values  [][]byte
+	value   []byte
 	deleted bool
 }
 
-func (entry *MemtableEntry) deserialize(entryBytes []byte) error {
+func (entry *Entry) deserialize(entryBytes []byte) error {
 	buf := bytes.NewBuffer(entryBytes)
 
 	idLen, err := mustReadByte(buf)
@@ -28,10 +28,6 @@ func (entry *MemtableEntry) deserialize(entryBytes []byte) error {
 	}
 	entry.id = id
 
-	_, err = mustReadByte(buf) //Discard content length
-	if err != nil {
-		return err
-	}
 	deleted_i, err := mustReadByte(buf)
 	if err != nil {
 		return err
@@ -41,25 +37,21 @@ func (entry *MemtableEntry) deserialize(entryBytes []byte) error {
 		entry.deleted = true
 	}
 
-	valuesCount, err := mustReadByte(buf)
+	valueLen, err := mustReadByte(buf)
 	if err != nil {
 		return err
 	}
-	for range valuesCount {
-		valueLen, err := mustReadByte(buf)
-		if err != nil {
-			return err
-		}
-		value, err := mustReadN(buf, int(valueLen))
-		if err != nil {
-			return err
-		}
-		entry.values = append(entry.values, value)
+
+	value, err := mustReadN(buf, int(valueLen))
+	if err != nil {
+		return err
 	}
+	entry.value = value
+
 	return nil
 }
 
-func (entry *MemtableEntry) serialize() (int, []byte) {
+func (entry *Entry) serialize() (int, []byte) {
 	var header bytes.Buffer
 	var content bytes.Buffer
 
@@ -72,14 +64,8 @@ func (entry *MemtableEntry) serialize() (int, []byte) {
 		content.WriteByte(0)
 	}
 
-	content.WriteByte(byte(len(entry.values)))
-	for _, v := range entry.values {
-		content.WriteByte(byte(len(v)))
-		content.Write(v)
-	}
-
-	contentBytes := content.Bytes()
-	header.WriteByte(byte(len(contentBytes)))
+	content.WriteByte(byte(len(entry.value)))
+	content.Write(entry.value)
 
 	bytes := append(header.Bytes(), content.Bytes()...)
 
@@ -96,36 +82,36 @@ func newMemtable() Memtable {
 	}
 }
 
-func (m *Memtable) Get(id []byte) *MemtableEntry {
+func (m *Memtable) Get(id []byte) *Entry {
 	for e := m.entries.Front(); e != nil; e = e.Next() {
-		if bytes.Equal(id, e.Value.(MemtableEntry).id) {
-			entry := e.Value.(MemtableEntry)
+		if bytes.Equal(id, e.Value.(Entry).id) {
+			entry := e.Value.(Entry)
 			return &entry
 		}
 	}
 	return nil
 }
 
-func (m *Memtable) update(id []byte, values [][]byte) {
+func (m *Memtable) update(id []byte, value []byte) {
 
-	entry := MemtableEntry{
+	entry := Entry{
 		id:      id,
-		values:  values,
+		value:   value,
 		deleted: false,
 	}
 
 	for e := m.entries.Front(); e != nil; e = e.Next() {
-		if bytes.Equal(e.Value.(MemtableEntry).id, id) {
+		if bytes.Equal(e.Value.(Entry).id, id) {
 			e.Value = entry
 			return
 		}
 	}
 }
 
-func (m *Memtable) insert(entry MemtableEntry) {
+func (m *Memtable) insert(entry Entry) {
 	for e := m.entries.Front(); e != nil; e = e.Next() {
 		next := e.Next()
-		if next != nil && bytes.Compare(entry.id, next.Value.(MemtableEntry).id) == -1 {
+		if next != nil && bytes.Compare(entry.id, next.Value.(Entry).id) == -1 {
 			m.entries.InsertBefore(entry, next)
 			return
 		}
@@ -134,10 +120,10 @@ func (m *Memtable) insert(entry MemtableEntry) {
 	m.entries.PushBack(entry)
 }
 
-func (m Memtable) insertRaw(id []byte, values [][]byte) {
-	entry := MemtableEntry{
+func (m Memtable) insertRaw(id []byte, value []byte) {
+	entry := Entry{
 		id:      id,
-		values:  values,
+		value:   value,
 		deleted: false,
 	}
 

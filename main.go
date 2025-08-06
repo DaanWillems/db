@@ -3,22 +3,29 @@ package main
 import (
 	storage "db/storage"
 	"fmt"
+	"log"
+	"os"
+	"runtime/pprof"
 )
 
 func main() {
+	log.Println("Starting...")
+	f, _ := os.Create("profile")
+	pprof.StartCPUProfile(f)
+	//defer pprof.StopCPUProfile()
+
 	storage.InitializeStorageEngine(storage.Config{
-		MemtableSize: 20,
+		MemtableSize:  500,
+		DataDirectory: "data",
 	})
 
-	// for i := range 200 {
-	// 	storage.Insert(i, []string{fmt.Sprintf("%v", i)})
+	// for i := range 1000 {
+	// 	storage.Insert(i, [][]byte{[]byte{byte(i)}})
 	// }
+	result, _ := storage.Query(999)
+	fmt.Printf("%08b\n", 999)
+	fmt.Printf("%08b\n", result)
 
-	result, err := storage.Query(80)
-
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Println(string(result))
+	//storage.Compact()
+	storage.Close()
 }

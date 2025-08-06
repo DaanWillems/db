@@ -8,29 +8,29 @@ import (
 )
 
 func TestSSTable(t *testing.T) {
-	memtable := NewMemtable()
+	memtable := newMemtable()
 
-	for id := range 10 {
-		memtable.insertRaw([]byte{byte(id)}, [][]byte{{byte(id)}, []byte("b")})
+	for id := range 3000 {
+		memtable.insertRaw(intToBytes(id), intToBytes(id))
 	}
+	buffer := bytes.Buffer{}
+	writer := newSSTableWriter(bufio.NewWriter(&buffer))
+	writer.writeFromMemtable(&memtable)
 
-	table, _ := createSSTableFromMemtable(&memtable, 10)
+	reader := bufio.NewReaderSize(&buffer, 1024*1024)
 
-	tableBytes := table.bytes()
+	for id := range 3000 {
+		result, _ := scanSSTable(reader, intToBytes(id))
 
-	reader := bufio.NewReader(bytes.NewReader(tableBytes))
-
-	for id := range 10 {
-		result, _ := searchInSSTable(reader, []byte{byte(id)})
-
-		entry := MemtableEntry{
-			[]byte{byte(id)},
-			[][]byte{{byte(id)}, []byte("b")},
+		entry := Entry{
+			intToBytes(id),
+			intToBytes(id),
 			false,
 		}
 
 		if !reflect.DeepEqual(&entry, result) {
 			t.Errorf("Result does not match query. \nExpected: \n%v\n Got:\n %v", entry, result)
+			return
 		}
 	}
 }

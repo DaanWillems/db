@@ -7,56 +7,56 @@ import (
 )
 
 func TestMemtableOrderStr(t *testing.T) {
-	memtable := NewMemtable()
+	memtable := newMemtable()
 
-	memtable.insertRaw([]byte("abc"), [][]byte{[]byte("a")})
-	memtable.insertRaw([]byte("bdq"), [][]byte{[]byte("a")})
-	memtable.insertRaw([]byte("abd"), [][]byte{[]byte("a")})
+	memtable.insertRaw([]byte("abc"), []byte("a"))
+	memtable.insertRaw([]byte("bdq"), []byte("a"))
+	memtable.insertRaw([]byte("abd"), []byte("a"))
 
 	entry := memtable.entries.Front()
-	if !bytes.Equal(entry.Value.(MemtableEntry).id, []byte("abc")) {
-		t.Errorf("Id does not match. Expected %v, got %s", "abc", entry.Value.(MemtableEntry).id)
+	if !bytes.Equal(entry.Value.(Entry).id, []byte("abc")) {
+		t.Errorf("Id does not match. Expected %v, got %s", "abc", entry.Value.(Entry).id)
 	}
 	entry = entry.Next()
-	if !bytes.Equal(entry.Value.(MemtableEntry).id, []byte("abd")) {
-		t.Errorf("Id does not match. Expected %v, got %s", "abd", entry.Value.(MemtableEntry).id)
+	if !bytes.Equal(entry.Value.(Entry).id, []byte("abd")) {
+		t.Errorf("Id does not match. Expected %v, got %s", "abd", entry.Value.(Entry).id)
 	}
 	entry = entry.Next()
-	if !bytes.Equal(entry.Value.(MemtableEntry).id, []byte("bdq")) {
-		t.Errorf("Id does not match. Expected %v, got %s", "bdq", entry.Value.(MemtableEntry).id)
+	if !bytes.Equal(entry.Value.(Entry).id, []byte("bdq")) {
+		t.Errorf("Id does not match. Expected %v, got %s", "bdq", entry.Value.(Entry).id)
 	}
 }
 
 func TestMemtableOrderInt(t *testing.T) {
-	memtable := NewMemtable()
+	memtable := newMemtable()
 
-	memtable.insertRaw([]byte{byte(1)}, [][]byte{[]byte("a")})
-	memtable.insertRaw([]byte{byte(3)}, [][]byte{[]byte("a")})
-	memtable.insertRaw([]byte{byte(2)}, [][]byte{[]byte("a")})
+	memtable.insertRaw([]byte{byte(1)}, []byte("a"))
+	memtable.insertRaw([]byte{byte(3)}, []byte("a"))
+	memtable.insertRaw([]byte{byte(2)}, []byte("a"))
 
 	entry := memtable.entries.Front()
-	if !bytes.Equal(entry.Value.(MemtableEntry).id, []byte{byte(1)}) {
-		t.Errorf("Id does not match. Expected %d, got %d", 1, entry.Value.(MemtableEntry).id)
+	if !bytes.Equal(entry.Value.(Entry).id, []byte{byte(1)}) {
+		t.Errorf("Id does not match. Expected %d, got %d", 1, entry.Value.(Entry).id)
 	}
 	entry = entry.Next()
-	if !bytes.Equal(entry.Value.(MemtableEntry).id, []byte{byte(2)}) {
-		t.Errorf("Id does not match. Expected %d, got %d", 2, entry.Value.(MemtableEntry).id)
+	if !bytes.Equal(entry.Value.(Entry).id, []byte{byte(2)}) {
+		t.Errorf("Id does not match. Expected %d, got %d", 2, entry.Value.(Entry).id)
 	}
 	entry = entry.Next()
-	if !bytes.Equal(entry.Value.(MemtableEntry).id, []byte{byte(3)}) {
-		t.Errorf("Id does not match. Expected %d, got %d", 3, entry.Value.(MemtableEntry).id)
+	if !bytes.Equal(entry.Value.(Entry).id, []byte{byte(3)}) {
+		t.Errorf("Id does not match. Expected %d, got %d", 3, entry.Value.(Entry).id)
 	}
 }
 
 func TestSerializeDeserializeStr(t *testing.T) {
-	e := MemtableEntry{
+	e := Entry{
 		id:      []byte("abc"),
-		values:  [][]byte{[]byte("a"), []byte("b")},
+		value:   []byte("abcd"),
 		deleted: false,
 	}
 
 	_, s := e.serialize()
-	e1 := MemtableEntry{}
+	e1 := Entry{}
 	e1.deserialize(s)
 
 	if !reflect.DeepEqual(e, e1) {
@@ -65,14 +65,14 @@ func TestSerializeDeserializeStr(t *testing.T) {
 }
 
 func TestSerializeDeserialize(t *testing.T) {
-	e := MemtableEntry{
-		id:      []byte{byte(9)},
-		values:  [][]byte{[]byte("a"), []byte("b")},
+	e := Entry{
+		id:      intToBytes(368),
+		value:   intToBytes(368),
 		deleted: false,
 	}
 
 	_, s := e.serialize()
-	e1 := MemtableEntry{}
+	e1 := Entry{}
 	e1.deserialize(s)
 
 	if !reflect.DeepEqual(e, e1) {

@@ -23,8 +23,8 @@ func closeLedger() {
 	fileLedger.ledgerFile.Close()
 }
 
-func loadFileLedger() {
-	indexFile, err := os.OpenFile("./data/ledger", os.O_RDWR|os.O_CREATE, 0644)
+func loadFileLedger(path string) {
+	indexFile, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {
 		panic(err)
 	}
@@ -57,17 +57,19 @@ func addFileToLedger(fileName string) {
 	fileLedger.ledgerFile.Sync()
 }
 
-func writeDataFile(table *SSTable) {
+func writeDataFile(memtable *Memtable) {
 	if !fileLedger.loaded {
 		panic("databaseFileStructure is not loaded")
 	}
 
 	fileName := fmt.Sprintf("%v", time.Now().UnixNano())
-
-	err := os.WriteFile(fmt.Sprintf("data/%v", fileName), *table.Blocks, 0644)
-	addFileToLedger(fileName)
+	fd, _ := os.Create(fmt.Sprintf("./data/%v", fileName))
+	writer := newSSTableWriter(bufio.NewWriter(fd))
+	err := writer.writeFromMemtable(memtable)
 
 	if err != nil {
 		panic(err)
 	}
+
+	addFileToLedger(fileName)
 }

@@ -4,99 +4,189 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
-	"io"
+	"fmt"
+	"os"
 )
 
-type SSTable struct {
-	Blocks *[]byte
+type SSTableWriter struct {
+	buffer          *bufio.Writer
+	currentBlockLen int //The length of the current block we're writing to
 }
 
-func createSSTableFromMemtable(memtable *Memtable, blockSize int) (*SSTable, error) {
-	currentBlock := []byte{}
-	blocks := []byte{}
+type SSTableReader struct {
+	reader     *bufio.Reader
+	bytes_read []byte
+}
 
-	for e := memtable.entries.Front(); e != nil; e = e.Next() {
-		entry := e.Value.(MemtableEntry)
+func newSSTableReader(buffer *bufio.Reader) SSTableReader {
+	return SSTableReader{
+		reader:     buffer,
+		bytes_read: []byte{},
+	}
+}
 
-		size, serialized_entry := entry.serialize()
-		//Check to see if there is enough place in the block to add the entry
-		if size > (blockSize - len(currentBlock)) {
-			if size > blockSize {
-				//Will never fit
-				return &SSTable{}, errors.New("entry larger than max block size")
-			}
-			//Pad remainder of block
-			padding := blockSize - len(currentBlock)
-			currentBlock = append(currentBlock, make([]byte, padding)...)
-			//Prepare new block
-			blocks = append(blocks, currentBlock...)
-			currentBlock = []byte{}
+func newSSTableReaderFromPath(path string) SSTableReader {
+	fd, err := os.Open(path)
+	panicIfErr(err)
+	return newSSTableReader(bufio.NewReaderSize(fd, 1024*1024))
+}
+
+func newSSTableWriter(buffer *bufio.Writer) SSTableWriter {
+	return SSTableWriter{
+		buffer:          buffer,
+		currentBlockLen: 0,
+	}
+}
+
+func newSSTableWriterFromPath(path string) (*os.File, SSTableWriter) {
+	fd, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0644)
+	panicIfErr(err)
+	return fd, newSSTableWriter(bufio.NewWriter(fd))
+}
+
+func (reader *SSTableReader) peekNextId() ([]byte, error) {
+
+	var idSize []byte
+
+	for {
+		var err error
+
+		idSize, err = reader.reader.Peek(1)
+
+		if len(idSize) == 0 || idSize[0] == byte(0) {
+			_, err = reader.reader.Read(make([]byte, 1))
 		}
 
-		currentBlock = append(currentBlock, serialized_entry...)
+		if err != nil {
+			return nil, err
+		}
+
+		if idSize[0] != byte(0) {
+			break
+		}
 	}
 
-	//Pad remainder of block
-	padding := blockSize - len(currentBlock)
-	currentBlock = append(currentBlock, make([]byte, padding)...)
-	blocks = append(blocks, currentBlock...)
+	readLength := int(idSize[0]) + 1
 
-	return &SSTable{Blocks: &blocks}, nil
+	content, err := reader.reader.Peek(readLength)
+	id := content[1:]
+
+	if err != nil {
+		return nil, err
+	}
+
+	return id, nil
 }
 
-func (table *SSTable) bytes() []byte {
-	return *table.Blocks
+func (reader *SSTableReader) readNextEntry() (Entry, error) {
+	idSize := make([]byte, 1)
+
+	for { //If the size is 0, it's padding in a block. Keep looking until a new block or EOF
+		_, err := reader.reader.Read(idSize)
+		reader.bytes_read = append(reader.bytes_read, idSize...)
+
+		if err != nil {
+			return Entry{}, err
+		}
+
+		if idSize[0] != byte(0) {
+			break
+		} else {
+			continue
+		}
+	}
+
+	id := make([]byte, int(idSize[0]))
+	_, err := reader.reader.Read(id)
+	if err != nil {
+		return Entry{}, err
+	}
+
+	deleted := make([]byte, 1)
+	_, err = reader.reader.Read(deleted)
+	if err != nil {
+		return Entry{}, err
+	}
+
+	valueLength := make([]byte, 1)
+	_, err = reader.reader.Read(valueLength)
+	if err != nil {
+		return Entry{}, err
+	}
+
+	value := make([]byte, valueLength[0])
+	_, err = reader.reader.Read(value)
+
+	if err != nil {
+		return Entry{}, err
+	}
+
+	all := []byte{}
+	all = append(all, idSize...)
+	all = append(all, id...)
+	all = append(all, deleted...)
+	all = append(all, valueLength...)
+	all = append(all, value...)
+
+	reader.bytes_read = append(reader.bytes_read, all...)
+
+	entry := Entry{}
+	entry.deserialize(all)
+	return entry, nil
 }
 
-func searchInSSTable(reader *bufio.Reader, searchId []byte) (*MemtableEntry, error) {
+func (writer *SSTableWriter) writeSingleEntry(entry *Entry) error {
+	blockSize := 100
+
+	size, serialized_entry := entry.serialize()
+	//Check to see if there is enough place in the block to add the entry
+	if size > (blockSize - writer.currentBlockLen) {
+		if size > blockSize {
+			//Will never fit
+			return errors.New("entry larger than max block size")
+		}
+
+		//Pad remainder of block
+		padding := blockSize - writer.currentBlockLen
+		// log.Printf("About to write padding %v", padding)
+
+		_, err := writer.buffer.Write(make([]byte, padding))
+		panicIfErr(err)
+
+		writer.currentBlockLen = 0
+	}
+
+	writer.currentBlockLen += size
+	_, err := writer.buffer.Write(serialized_entry)
+	panicIfErr(err)
+	writer.buffer.Flush()
+	return nil
+}
+
+func (writer *SSTableWriter) writeFromMemtable(memtable *Memtable) error {
+	for e := memtable.entries.Front(); e != nil; e = e.Next() {
+		entry := e.Value.(Entry)
+		writer.writeSingleEntry(&entry)
+	}
+	return nil
+}
+
+func scanSSTable(buffer *bufio.Reader, searchId []byte) (*Entry, error) {
+	reader := newSSTableReader(buffer)
+	count := 0
 	for {
-		idSize := make([]byte, 1)
-		_, err := reader.Read(idSize)
-
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				return nil, nil
-			}
-			return &MemtableEntry{}, err
+		if count == 368 {
+			fmt.Printf("\n")
 		}
+		count++
+		entry, err := reader.readNextEntry()
 
-		if idSize[0] == byte(0) {
+		if checkEOF(err) {
+			return nil, nil
+		}
+		if !bytes.Equal(entry.id, searchId) {
 			continue
 		}
-
-		id := make([]byte, int(idSize[0]))
-		contentLength := make([]byte, 1)
-
-		_, err = reader.Read(id)
-		if err != nil {
-			return &MemtableEntry{}, err
-		}
-
-		_, err = reader.Read(contentLength)
-		if err != nil {
-			return &MemtableEntry{}, err
-		}
-
-		if !bytes.Equal(id, searchId) {
-			reader.Discard(int(contentLength[0]))
-			continue
-		}
-
-		content := make([]byte, contentLength[0])
-		_, err = reader.Read(content)
-
-		if err != nil {
-			return &MemtableEntry{}, err
-		}
-
-		all := []byte{}
-		all = append(all, idSize...)
-		all = append(all, id...)
-		all = append(all, contentLength...)
-		all = append(all, content...)
-
-		entry := &MemtableEntry{}
-		entry.deserialize(all)
-		return entry, nil
+		return &entry, nil
 	}
 }
