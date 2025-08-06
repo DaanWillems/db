@@ -10,7 +10,7 @@ import (
 
 type Entry struct {
 	id      []byte
-	values  [][]byte
+	value   []byte
 	deleted bool
 }
 
@@ -28,10 +28,6 @@ func (entry *Entry) deserialize(entryBytes []byte) error {
 	}
 	entry.id = id
 
-	_, err = mustReadByte(buf) //Discard content length
-	if err != nil {
-		return err
-	}
 	deleted_i, err := mustReadByte(buf)
 	if err != nil {
 		return err
@@ -41,21 +37,17 @@ func (entry *Entry) deserialize(entryBytes []byte) error {
 		entry.deleted = true
 	}
 
-	valuesCount, err := mustReadByte(buf)
+	valueLen, err := mustReadByte(buf)
 	if err != nil {
 		return err
 	}
-	for range valuesCount {
-		valueLen, err := mustReadByte(buf)
-		if err != nil {
-			return err
-		}
-		value, err := mustReadN(buf, int(valueLen))
-		if err != nil {
-			return err
-		}
-		entry.values = append(entry.values, value)
+
+	value, err := mustReadN(buf, int(valueLen))
+	if err != nil {
+		return err
 	}
+	entry.value = value
+
 	return nil
 }
 
@@ -72,14 +64,8 @@ func (entry *Entry) serialize() (int, []byte) {
 		content.WriteByte(0)
 	}
 
-	content.WriteByte(byte(len(entry.values)))
-	for _, v := range entry.values {
-		content.WriteByte(byte(len(v)))
-		content.Write(v)
-	}
-
-	contentBytes := content.Bytes()
-	header.WriteByte(byte(len(contentBytes)))
+	content.WriteByte(byte(len(entry.value)))
+	content.Write(entry.value)
 
 	bytes := append(header.Bytes(), content.Bytes()...)
 
@@ -106,11 +92,11 @@ func (m *Memtable) Get(id []byte) *Entry {
 	return nil
 }
 
-func (m *Memtable) update(id []byte, values [][]byte) {
+func (m *Memtable) update(id []byte, value []byte) {
 
 	entry := Entry{
 		id:      id,
-		values:  values,
+		value:   value,
 		deleted: false,
 	}
 
@@ -134,10 +120,10 @@ func (m *Memtable) insert(entry Entry) {
 	m.entries.PushBack(entry)
 }
 
-func (m Memtable) insertRaw(id []byte, values [][]byte) {
+func (m Memtable) insertRaw(id []byte, value []byte) {
 	entry := Entry{
 		id:      id,
-		values:  values,
+		value:   value,
 		deleted: false,
 	}
 

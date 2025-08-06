@@ -9,9 +9,9 @@ import (
 func TestMemtableOrderStr(t *testing.T) {
 	memtable := newMemtable()
 
-	memtable.insertRaw([]byte("abc"), [][]byte{[]byte("a")})
-	memtable.insertRaw([]byte("bdq"), [][]byte{[]byte("a")})
-	memtable.insertRaw([]byte("abd"), [][]byte{[]byte("a")})
+	memtable.insertRaw([]byte("abc"), []byte("a"))
+	memtable.insertRaw([]byte("bdq"), []byte("a"))
+	memtable.insertRaw([]byte("abd"), []byte("a"))
 
 	entry := memtable.entries.Front()
 	if !bytes.Equal(entry.Value.(Entry).id, []byte("abc")) {
@@ -30,9 +30,9 @@ func TestMemtableOrderStr(t *testing.T) {
 func TestMemtableOrderInt(t *testing.T) {
 	memtable := newMemtable()
 
-	memtable.insertRaw([]byte{byte(1)}, [][]byte{[]byte("a")})
-	memtable.insertRaw([]byte{byte(3)}, [][]byte{[]byte("a")})
-	memtable.insertRaw([]byte{byte(2)}, [][]byte{[]byte("a")})
+	memtable.insertRaw([]byte{byte(1)}, []byte("a"))
+	memtable.insertRaw([]byte{byte(3)}, []byte("a"))
+	memtable.insertRaw([]byte{byte(2)}, []byte("a"))
 
 	entry := memtable.entries.Front()
 	if !bytes.Equal(entry.Value.(Entry).id, []byte{byte(1)}) {
@@ -51,7 +51,7 @@ func TestMemtableOrderInt(t *testing.T) {
 func TestSerializeDeserializeStr(t *testing.T) {
 	e := Entry{
 		id:      []byte("abc"),
-		values:  [][]byte{[]byte("a"), []byte("b")},
+		value:   []byte("abcd"),
 		deleted: false,
 	}
 
@@ -66,8 +66,8 @@ func TestSerializeDeserializeStr(t *testing.T) {
 
 func TestSerializeDeserialize(t *testing.T) {
 	e := Entry{
-		id:      []byte{byte(9)},
-		values:  [][]byte{[]byte("a"), []byte("b")},
+		id:      intToBytes(368),
+		value:   intToBytes(368),
 		deleted: false,
 	}
 

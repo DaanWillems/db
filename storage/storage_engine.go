@@ -48,10 +48,10 @@ func Compact() {
 	compactNSSTables([]*SSTableReader{&b1, &b2}, &b3)
 }
 
-func Insert(id int, values [][]byte) {
+func Insert(id int, value []byte) {
 	entry := Entry{
 		id:      []byte{byte(id)},
-		values:  values,
+		value:   value,
 		deleted: false,
 	}
 
@@ -70,7 +70,7 @@ func Query(id int) ([]byte, error) {
 	entry := memtable.Get([]byte{byte(id)})
 
 	if entry != nil {
-		return entry.values[0], nil
+		return entry.value, nil
 	}
 
 	for _, path := range getDataIndex() {
@@ -87,7 +87,7 @@ func Query(id int) ([]byte, error) {
 			continue
 		}
 
-		return entry.values[0], nil
+		return entry.value, nil
 	}
 
 	return nil, nil

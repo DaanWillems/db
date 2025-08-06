@@ -1,8 +1,7 @@
 package storage
 
 import (
-	"bufio"
-	"bytes"
+	"log"
 	"reflect"
 	"testing"
 )
@@ -10,28 +9,31 @@ import (
 func TestSSTable(t *testing.T) {
 	memtable := newMemtable()
 
-	for id := range 1000 {
-		memtable.insertRaw([]byte{byte(id)}, [][]byte{{byte(id)}, []byte("b")})
+	for id := range 369 {
+		log.Printf("Printing %d\n", id)
+		memtable.insertRaw(intToBytes(id), intToBytes(id))
 	}
 
-	buffer := bytes.Buffer{}
-	writer := newSSTableWriter(bufio.NewWriter(&buffer))
+	// buffer := bytes.Buffer{}
+	// writer := newSSTableWriter(bufio.NewWriter(&buffer))
+	// writer := newSSTableWriterFromPath("abc")
 
-	writer.writeFromMemtable(&memtable)
+	// writer.writeFromMemtable(&memtable)
+	// writer.writeFromMemtable(&memtable)
 
-	reader := bufio.NewReader(&buffer)
+	// reader := bufio.NewReader(&buffer)
 
-	for id := range 1000 {
-		result, _ := scanSSTable(reader, []byte{byte(id)})
+	reader2 := newSSTableReaderFromPath("abc")
+	// result, _ := scanSSTable(reader, intToBytes(368))
+	result, _ := scanSSTable(reader2.reader, intToBytes(368))
 
-		entry := Entry{
-			[]byte{byte(id)},
-			[][]byte{{byte(id)}, []byte("b")},
-			false,
-		}
+	entry := Entry{
+		intToBytes(368),
+		intToBytes(368),
+		false,
+	}
 
-		if !reflect.DeepEqual(&entry, result) {
-			t.Errorf("Result does not match query. \nExpected: \n%v\n Got:\n %v", entry, result)
-		}
+	if !reflect.DeepEqual(&entry, result) {
+		t.Errorf("Result does not match query. \nExpected: \n%v\n Got:\n %v", entry, result)
 	}
 }

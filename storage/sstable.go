@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
+	"fmt"
+	"os"
 )
 
 type SSTableWriter struct {
@@ -21,11 +23,23 @@ func newSSTableReader(buffer *bufio.Reader) SSTableReader {
 	}
 }
 
+func newSSTableReaderFromPath(path string) SSTableReader {
+	fd, err := os.Open(path)
+	panicIfErr(err)
+	return newSSTableReader(bufio.NewReader(fd))
+}
+
 func newSSTableWriter(buffer *bufio.Writer) SSTableWriter {
 	return SSTableWriter{
 		buffer:          buffer,
 		currentBlockLen: 0,
 	}
+}
+
+func newSSTableWriterFromPath(path string) SSTableWriter {
+	fd, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0644)
+	panicIfErr(err)
+	return newSSTableWriter(bufio.NewWriter(fd))
 }
 
 func (reader *SSTableReader) peekNextId() ([]byte, error) {
@@ -74,24 +88,31 @@ func (reader *SSTableReader) readNextEntry() (Entry, error) {
 
 		if idSize[0] != byte(0) {
 			break
+		} else {
+			continue
 		}
 	}
 
 	id := make([]byte, int(idSize[0]))
-	contentLength := make([]byte, 1)
-
 	_, err := reader.reader.Read(id)
 	if err != nil {
 		return Entry{}, err
 	}
 
-	_, err = reader.reader.Read(contentLength)
+	deleted := make([]byte, 1)
+	_, err = reader.reader.Read(deleted)
 	if err != nil {
 		return Entry{}, err
 	}
 
-	content := make([]byte, contentLength[0])
-	_, err = reader.reader.Read(content)
+	valueLength := make([]byte, 1)
+	_, err = reader.reader.Read(valueLength)
+	if err != nil {
+		return Entry{}, err
+	}
+
+	value := make([]byte, valueLength[0])
+	_, err = reader.reader.Read(value)
 
 	if err != nil {
 		return Entry{}, err
@@ -100,8 +121,9 @@ func (reader *SSTableReader) readNextEntry() (Entry, error) {
 	all := []byte{}
 	all = append(all, idSize...)
 	all = append(all, id...)
-	all = append(all, contentLength...)
-	all = append(all, content...)
+	all = append(all, deleted...)
+	all = append(all, valueLength...)
+	all = append(all, value...)
 
 	entry := Entry{}
 	entry.deserialize(all)
@@ -110,6 +132,11 @@ func (reader *SSTableReader) readNextEntry() (Entry, error) {
 
 func (writer *SSTableWriter) writeSingleEntry(entry *Entry) error {
 	blockSize := 100
+
+	if bytes.Compare(entry.id, intToBytes(368)) == 0 {
+		fmt.Printf("\n")
+	}
+
 	size, serialized_entry := entry.serialize()
 	//Check to see if there is enough place in the block to add the entry
 	if size > (blockSize - writer.currentBlockLen) {
@@ -143,10 +170,15 @@ func (writer *SSTableWriter) writeFromMemtable(memtable *Memtable) error {
 func scanSSTable(buffer *bufio.Reader, searchId []byte) (*Entry, error) {
 	reader := newSSTableReader(buffer)
 	for {
+		test, _ := reader.peekNextId()
+		if bytes.Compare(test, intToBytes(368)) == 0 {
+			fmt.Printf("\n")
+		}
 		entry, err := reader.readNextEntry()
 		if checkEOF(err) {
 			return nil, nil
 		}
+		fmt.Printf("%v entry id\n", entry.id)
 		if !bytes.Equal(entry.id, searchId) {
 			continue
 		}

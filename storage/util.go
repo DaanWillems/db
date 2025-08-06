@@ -1,7 +1,10 @@
 package storage
 
 import (
+	"bytes"
+	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 )
@@ -53,6 +56,20 @@ func (b DbBool) Bytes() []byte {
 		return []byte{byte(1)}
 	}
 	return []byte{byte(0)}
+}
+
+func intToBytes(i int) []byte {
+	// Create a buffer
+	buf := new(bytes.Buffer)
+
+	// Write the integer to the buffer in BigEndian (you can also use LittleEndian)
+	err := binary.Write(buf, binary.BigEndian, int32(i))
+	if err != nil {
+		fmt.Println("binary.Write failed:", err)
+	}
+
+	byteSlice := buf.Bytes()
+	return byteSlice
 }
 
 func checkEOF(err error) bool {
