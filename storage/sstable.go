@@ -3,10 +3,8 @@ package storage
 import (
 	"bufio"
 	"bytes"
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 )
 
@@ -16,12 +14,14 @@ type SSTableWriter struct {
 }
 
 type SSTableReader struct {
-	reader *bufio.Reader
+	reader     *bufio.Reader
+	bytes_read []byte
 }
 
 func newSSTableReader(buffer *bufio.Reader) SSTableReader {
 	return SSTableReader{
-		reader: buffer,
+		reader:     buffer,
+		bytes_read: []byte{},
 	}
 }
 
@@ -38,10 +38,10 @@ func newSSTableWriter(buffer *bufio.Writer) SSTableWriter {
 	}
 }
 
-func newSSTableWriterFromPath(path string) SSTableWriter {
+func newSSTableWriterFromPath(path string) (*os.File, SSTableWriter) {
 	fd, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0644)
 	panicIfErr(err)
-	return newSSTableWriter(bufio.NewWriter(fd))
+	return fd, newSSTableWriter(bufio.NewWriter(fd))
 }
 
 func (reader *SSTableReader) peekNextId() ([]byte, error) {
@@ -83,6 +83,7 @@ func (reader *SSTableReader) readNextEntry() (Entry, error) {
 
 	for { //If the size is 0, it's padding in a block. Keep looking until a new block or EOF
 		_, err := reader.reader.Read(idSize)
+		reader.bytes_read = append(reader.bytes_read, idSize...)
 
 		if err != nil {
 			return Entry{}, err
@@ -127,18 +128,18 @@ func (reader *SSTableReader) readNextEntry() (Entry, error) {
 	all = append(all, valueLength...)
 	all = append(all, value...)
 
-	log.Printf("Just parsed entry: %v", hex.EncodeToString(all))
+	reader.bytes_read = append(reader.bytes_read, all...)
+
 	entry := Entry{}
 	entry.deserialize(all)
+	// log.Printf("Read raw bytes: %s", hex.EncodeToString(all))
+	// log.Printf("Parsed - ID: %v, Value: %v", entry.id, entry.value)
+	// fmt.Printf("Last bytes %v\n", hex.EncodeToString(lastN(reader.bytes_read, 22)))
 	return entry, nil
 }
 
 func (writer *SSTableWriter) writeSingleEntry(entry *Entry) error {
-	blockSize := 100
-
-	if bytes.Compare(entry.id, intToBytes(368)) == 0 {
-		fmt.Printf("\n")
-	}
+	blockSize := 15
 
 	size, serialized_entry := entry.serialize()
 	//Check to see if there is enough place in the block to add the entry
@@ -150,12 +151,16 @@ func (writer *SSTableWriter) writeSingleEntry(entry *Entry) error {
 
 		//Pad remainder of block
 		padding := blockSize - writer.currentBlockLen
-		writer.buffer.Write(make([]byte, padding))
+		// log.Printf("About to write padding %v", padding)
+
+		_, err := writer.buffer.Write(make([]byte, padding))
+		panicIfErr(err)
 
 		writer.currentBlockLen = 0
 	}
 
 	writer.currentBlockLen += size
+	// log.Printf("About to write entry %v: %s", entry.id, hex.EncodeToString(serialized_entry))
 	_, err := writer.buffer.Write(serialized_entry)
 	panicIfErr(err)
 	writer.buffer.Flush()
@@ -172,16 +177,17 @@ func (writer *SSTableWriter) writeFromMemtable(memtable *Memtable) error {
 
 func scanSSTable(buffer *bufio.Reader, searchId []byte) (*Entry, error) {
 	reader := newSSTableReader(buffer)
+	count := 0
 	for {
-		test, _ := reader.peekNextId()
-		if bytes.Compare(test, intToBytes(368)) == 0 {
+		if count == 368 {
 			fmt.Printf("\n")
 		}
+		count++
 		entry, err := reader.readNextEntry()
+
 		if checkEOF(err) {
 			return nil, nil
 		}
-		fmt.Printf("%v entry id\n", entry.id)
 		if !bytes.Equal(entry.id, searchId) {
 			continue
 		}

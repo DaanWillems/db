@@ -19,9 +19,9 @@ func main() {
 		DataDirectory: "data",
 	})
 
-	for i := range 1000 {
-		storage.Insert(i, [][]byte{[]byte{byte(i)}})
-	}
+	// for i := range 1000 {
+	// 	storage.Insert(i, [][]byte{[]byte{byte(i)}})
+	// }
 	result, _ := storage.Query(999)
 	fmt.Printf("%08b\n", 999)
 	fmt.Printf("%08b\n", result)
