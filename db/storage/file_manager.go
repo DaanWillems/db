@@ -97,8 +97,7 @@ func (fileLedger *FileManager) writeDataFile(memtable *Memtable) {
 	}
 
 	fileName := fmt.Sprintf("%v", time.Now().UnixNano())
-	fd, _ := os.Create(fmt.Sprintf("./%v/%v", config.DataDirectory, fileName))
-	writer := newSSTableWriter(bufio.NewWriter(fd))
+	writer := newSSTableWriterFromPath(fmt.Sprintf("./%v/%v", config.DataDirectory, fileName))
 	err := writer.writeFromMemtable(memtable)
 
 	if err != nil {
