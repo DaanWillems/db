@@ -58,7 +58,7 @@ func (b DbBool) Bytes() []byte {
 	return []byte{byte(0)}
 }
 
-func intToBytes(i int) []byte {
+func IntToBytes(i int) []byte {
 	// Create a buffer
 	buf := new(bytes.Buffer)
 

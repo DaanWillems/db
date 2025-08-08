@@ -1,10 +1,10 @@
-package storage
+package main
 
 import (
 	"bufio"
 	"bytes"
 	"errors"
-	"fmt"
+	"io"
 	"os"
 )
 
@@ -14,21 +14,25 @@ type SSTableWriter struct {
 }
 
 type SSTableReader struct {
-	reader     *bufio.Reader
-	bytes_read []byte
+	buffer    *bufio.Reader
+	rawBuffer *bytes.Buffer
+	file      *os.File
 }
 
-func newSSTableReader(buffer *bufio.Reader) SSTableReader {
+func newSSTableReader(rawBuffer *bytes.Buffer) SSTableReader {
 	return SSTableReader{
-		reader:     buffer,
-		bytes_read: []byte{},
+		buffer:    bufio.NewReader(rawBuffer),
+		rawBuffer: rawBuffer,
 	}
 }
 
 func newSSTableReaderFromPath(path string) SSTableReader {
 	fd, err := os.Open(path)
 	panicIfErr(err)
-	return newSSTableReader(bufio.NewReaderSize(fd, 1024*1024))
+	return SSTableReader{
+		buffer: bufio.NewReader(fd),
+		file:   fd,
+	}
 }
 
 func newSSTableWriter(buffer *bufio.Writer) SSTableWriter {
@@ -38,38 +42,36 @@ func newSSTableWriter(buffer *bufio.Writer) SSTableWriter {
 	}
 }
 
-func newSSTableWriterFromPath(path string) (*os.File, SSTableWriter) {
+func newSSTableWriterFromPath(path string) SSTableWriter {
 	fd, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0644)
 	panicIfErr(err)
-	return fd, newSSTableWriter(bufio.NewWriter(fd))
+	return SSTableWriter{
+		buffer:          bufio.NewWriter(fd),
+		currentBlockLen: 0,
+	}
 }
 
 func (reader *SSTableReader) peekNextId() ([]byte, error) {
 
-	var idSize []byte
+	pos := 1
+	var idSize int
 
 	for {
-		var err error
-
-		idSize, err = reader.reader.Peek(1)
-
-		if len(idSize) == 0 || idSize[0] == byte(0) {
-			_, err = reader.reader.Read(make([]byte, 1))
-		}
-
-		if err != nil {
+		var result []byte
+		result, err := reader.buffer.Peek(pos)
+		if checkEOF(err) {
 			return nil, err
 		}
-
-		if idSize[0] != byte(0) {
-			break
+		if result[len(result)-1] == byte(0) {
+			pos += 1
+			continue
 		}
+		idSize = int(result[len(result)-1])
+		break
 	}
 
-	readLength := int(idSize[0]) + 1
-
-	content, err := reader.reader.Peek(readLength)
-	id := content[1:]
+	content, err := reader.buffer.Peek(pos + idSize)
+	id := content[pos:]
 
 	if err != nil {
 		return nil, err
@@ -79,17 +81,20 @@ func (reader *SSTableReader) peekNextId() ([]byte, error) {
 }
 
 func (reader *SSTableReader) readNextEntry() (Entry, error) {
+	blockSize := 100
+
 	idSize := make([]byte, 1)
 
 	for { //If the size is 0, it's padding in a block. Keep looking until a new block or EOF
-		_, err := reader.reader.Read(idSize)
-		reader.bytes_read = append(reader.bytes_read, idSize...)
+		_, err := reader.buffer.Read(idSize)
 
 		if err != nil {
 			return Entry{}, err
 		}
 
 		if idSize[0] != byte(0) {
+			//Try to read next block into buffer
+			reader.buffer.Peek(blockSize)
 			break
 		} else {
 			continue
@@ -97,25 +102,25 @@ func (reader *SSTableReader) readNextEntry() (Entry, error) {
 	}
 
 	id := make([]byte, int(idSize[0]))
-	_, err := reader.reader.Read(id)
+	_, err := reader.buffer.Read(id)
 	if err != nil {
 		return Entry{}, err
 	}
 
 	deleted := make([]byte, 1)
-	_, err = reader.reader.Read(deleted)
+	_, err = reader.buffer.Read(deleted)
 	if err != nil {
 		return Entry{}, err
 	}
 
 	valueLength := make([]byte, 1)
-	_, err = reader.reader.Read(valueLength)
+	_, err = reader.buffer.Read(valueLength)
 	if err != nil {
 		return Entry{}, err
 	}
 
 	value := make([]byte, valueLength[0])
-	_, err = reader.reader.Read(value)
+	_, err = reader.buffer.Read(value)
 
 	if err != nil {
 		return Entry{}, err
@@ -127,8 +132,6 @@ func (reader *SSTableReader) readNextEntry() (Entry, error) {
 	all = append(all, deleted...)
 	all = append(all, valueLength...)
 	all = append(all, value...)
-
-	reader.bytes_read = append(reader.bytes_read, all...)
 
 	entry := Entry{}
 	entry.deserialize(all)
@@ -171,18 +174,38 @@ func (writer *SSTableWriter) writeFromMemtable(memtable *Memtable) error {
 	return nil
 }
 
-func scanSSTable(buffer *bufio.Reader, searchId []byte) (*Entry, error) {
-	reader := newSSTableReader(buffer)
+func (reader *SSTableReader) reset() {
+	if reader.rawBuffer != nil {
+		reader.buffer = bufio.NewReader(bytes.NewReader(reader.rawBuffer.Bytes()))
+	} else if reader.file != nil {
+		reader.file.Seek(0, io.SeekStart)
+		reader.buffer = bufio.NewReader(reader.file)
+	}
+}
+
+// Method for testing, fully scans the table and returns the number of entires
+func (reader *SSTableReader) count() int {
 	count := 0
+	reader.reset()
 	for {
-		if count == 368 {
-			fmt.Printf("\n")
+		_, err := reader.readNextEntry()
+		if checkEOF(err) {
+			return count
 		}
 		count++
+	}
+}
+
+func (reader *SSTableReader) scan(searchId []byte) (*Entry, error) {
+	reader.reset()
+	for {
 		entry, err := reader.readNextEntry()
 
 		if checkEOF(err) {
 			return nil, nil
+		}
+		if err != nil {
+			return nil, err
 		}
 		if !bytes.Equal(entry.id, searchId) {
 			continue

@@ -8,6 +8,10 @@ import (
 	"io"
 )
 
+type Memtable struct {
+	entries *list.List
+}
+
 type Entry struct {
 	id      []byte
 	value   []byte
@@ -70,10 +74,6 @@ func (entry *Entry) serialize() (int, []byte) {
 	bytes := append(header.Bytes(), content.Bytes()...)
 
 	return len(bytes), bytes
-}
-
-type Memtable struct {
-	entries *list.List
 }
 
 func newMemtable() Memtable {

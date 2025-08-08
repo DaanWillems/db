@@ -14,9 +14,9 @@ var wal_writer *bufio.Writer
 func openWAL(path string) {
 	var err error
 	wal_path = path
-	wal_file, err = os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	wal_file, err = fileManager.openWriteFile(path)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	wal_writer = bufio.NewWriter(wal_file)
 }
@@ -26,7 +26,7 @@ func resetWAL() {
 	wal_file.Close()
 	wal_file, err = os.Create(wal_path)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	wal_writer = bufio.NewWriter(wal_file)
 }

@@ -5,25 +5,24 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"runtime/pprof"
 )
 
 func main() {
 	log.Println("Starting...")
-	f, _ := os.Create("profile")
-	pprof.StartCPUProfile(f)
-	//defer pprof.StopCPUProfile()
+	os.RemoveAll("./data")
+	os.Mkdir("./data", 0700)
 
 	storage.InitializeStorageEngine(storage.Config{
 		MemtableSize:  500,
 		DataDirectory: "data",
+		BlockSize:     100,
 	})
 
-	// for i := range 1000 {
-	// 	storage.Insert(i, [][]byte{[]byte{byte(i)}})
-	// }
-	result, _ := storage.Query(999)
-	fmt.Printf("%08b\n", 999)
+	for i := range 1000 {
+		storage.Insert(i, storage.IntToBytes(i))
+	}
+
+	result, _ := storage.Query(storage.IntToBytes(21))
 	fmt.Printf("%08b\n", result)
 
 	//storage.Compact()

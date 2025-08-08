@@ -1,4 +1,4 @@
-package storage
+package main
 
 import (
 	"bytes"
@@ -66,8 +66,8 @@ func TestSerializeDeserializeStr(t *testing.T) {
 
 func TestSerializeDeserialize(t *testing.T) {
 	e := Entry{
-		id:      intToBytes(368),
-		value:   intToBytes(368),
+		id:      IntToBytes(368),
+		value:   IntToBytes(368),
 		deleted: false,
 	}
 
