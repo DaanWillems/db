@@ -2,6 +2,7 @@ package storage
 
 import (
 	"bufio"
+	"bytes"
 	"io"
 	"log"
 	"os"
@@ -77,7 +78,7 @@ func replayWal(_wal_path string) {
 		}
 
 		entry := &Entry{}
-		entry.deserialize(content)
+		entry.deserialize(bufio.NewReader(bytes.NewBuffer(content)))
 
 		memtable.insert(*entry)
 	}

@@ -3,6 +3,7 @@ package storage
 import (
 	"bufio"
 	"fmt"
+	"log"
 	"os"
 	"time"
 )
@@ -17,12 +18,25 @@ type FileManager struct {
 
 var fileManager FileManager
 
-func (fileLedger *FileManager) close() {
-	if !fileLedger.loaded {
-		panic("File ledger is not loaded")
+func (fileManager *FileManager) close() {
+	if fileManager.loaded {
+		fileManager.ledgerFile.Close()
 	}
 
-	fileLedger.ledgerFile.Close()
+	for _, fd := range fileManager.openReadFiles {
+		err := fd.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	for _, fd := range fileManager.openWriteFiles {
+		err := fd.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
 }
 
 func initFileManager(path string) {
@@ -52,12 +66,12 @@ func initFileManager(path string) {
 	fileManager.ledger = dataFiles
 }
 
-func (fileLedger *FileManager) getDataIndex() []string {
-	return fileLedger.ledger
+func (fileManager *FileManager) getDataIndex() []string {
+	return fileManager.ledger
 }
 
-func (fileLedger *FileManager) openWriteFile(path string) (*os.File, error) {
-	if val, ok := fileLedger.openWriteFiles[path]; ok {
+func (fileManager *FileManager) openWriteFile(path string) (*os.File, error) {
+	if val, ok := fileManager.openWriteFiles[path]; ok {
 		return val, nil
 	}
 	fd, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0644)
@@ -66,13 +80,13 @@ func (fileLedger *FileManager) openWriteFile(path string) (*os.File, error) {
 		return nil, err
 	}
 
-	fileLedger.openWriteFiles[path] = fd
+	fileManager.openWriteFiles[path] = fd
 
 	return fd, nil
 }
 
-func (fileLedger *FileManager) openReadFile(path string) (*os.File, error) {
-	if val, ok := fileLedger.openReadFiles[path]; ok {
+func (fileManager *FileManager) openReadFile(path string) (*os.File, error) {
+	if val, ok := fileManager.openReadFiles[path]; ok {
 		return val, nil
 	}
 	fd, err := os.Open(path)
@@ -80,19 +94,19 @@ func (fileLedger *FileManager) openReadFile(path string) (*os.File, error) {
 		return nil, err
 	}
 
-	fileLedger.openReadFiles[path] = fd
+	fileManager.openReadFiles[path] = fd
 
 	return fd, nil
 }
 
-func (fileLedger *FileManager) addFileToLedger(fileName string) {
-	fileLedger.ledger = append(fileLedger.ledger, fileName)
-	fileLedger.ledgerFile.Write([]byte(fileName + "\n"))
-	fileLedger.ledgerFile.Sync()
+func (fileManager *FileManager) addFileToLedger(fileName string) {
+	fileManager.ledger = append(fileManager.ledger, fileName)
+	fileManager.ledgerFile.Write([]byte(fileName + "\n"))
+	fileManager.ledgerFile.Sync()
 }
 
-func (fileLedger *FileManager) writeDataFile(memtable *Memtable) {
-	if !fileLedger.loaded {
+func (fileManager *FileManager) writeDataFile(memtable *Memtable) {
+	if !fileManager.loaded {
 		panic("databaseFileStructure is not loaded")
 	}
 
@@ -104,5 +118,5 @@ func (fileLedger *FileManager) writeDataFile(memtable *Memtable) {
 		panic(err)
 	}
 
-	fileLedger.addFileToLedger(fileName)
+	fileManager.addFileToLedger(fileName)
 }

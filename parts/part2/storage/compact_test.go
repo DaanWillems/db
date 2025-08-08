@@ -61,6 +61,64 @@ func TestFullCompaction(t *testing.T) {
 	os.RemoveAll("./tmp")
 }
 
+func TestTripleCompaction(t *testing.T) {
+	os.RemoveAll("./tmp")
+	err := os.Mkdir("tmp", 0700)
+
+	InitializeStorageEngine(Config{
+		MemtableSize:  50,
+		DataDirectory: "./tmp",
+		BlockSize:     100,
+	})
+	panicIfErr(err)
+
+	for id := range 50 {
+		Insert(id, IntToBytes(id))
+	}
+
+	for id := range 50 {
+		Insert(id, IntToBytes(id))
+	}
+
+	for id := range 50 {
+		Insert(id, IntToBytes(id))
+	}
+
+	index := fileManager.getDataIndex()
+
+	if len(index) < 2 {
+		return
+	}
+
+	r1 := newSSTableReaderFromPath(fmt.Sprintf("./tmp/%v", index[0]))
+	r2 := newSSTableReaderFromPath(fmt.Sprintf("./tmp/%v", index[1]))
+	r3 := newSSTableReaderFromPath(fmt.Sprintf("./tmp/%v", index[2]))
+	w1 := newSSTableWriterFromPath("./tmp/output")
+
+	compactNSSTables([]*SSTableReader{&r1, &r2, &r3}, &w1)
+
+	reader := newSSTableReaderFromPath("./tmp/output")
+
+	for id := range 50 {
+		result, _ := reader.scan(IntToBytes(id))
+
+		entry := Entry{
+			IntToBytes(id),
+			IntToBytes(id),
+			false,
+		}
+
+		if !reflect.DeepEqual(&entry, result) {
+			t.Errorf("Result does not match query. \nExpected: \n%v\n Got:\n %v", entry, result)
+		}
+	}
+	count := reader.count()
+	if count != 50 {
+		t.Errorf("Entry count does not match, expected 50 got %v", count)
+	}
+	os.RemoveAll("./tmp")
+}
+
 func TestUpdateCompaction(t *testing.T) {
 	os.RemoveAll("./tmp")
 	err := os.Mkdir("tmp", 0700)

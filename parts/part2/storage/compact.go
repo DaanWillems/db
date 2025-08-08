@@ -2,7 +2,6 @@ package storage
 
 import (
 	"bytes"
-	"fmt"
 )
 
 func getNextEntry(readers []*SSTableReader) (*Entry, []*SSTableReader) {
@@ -12,11 +11,10 @@ func getNextEntry(readers []*SSTableReader) (*Entry, []*SSTableReader) {
 
 	//Get reader with smallest key
 	//Its assumed that readers are ordered oldest to newest
-	for path, reader := range readers {
+	for _, reader := range readers {
 		id, err := reader.peekNextId()
 		if checkEOF(err) {
 			emptyReaders = append(emptyReaders, reader)
-			fmt.Printf("%v empty \n", path)
 			continue
 		}
 

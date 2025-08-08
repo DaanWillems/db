@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"bufio"
 	"bytes"
 	"reflect"
 	"testing"
@@ -57,7 +58,7 @@ func TestSerializeDeserializeStr(t *testing.T) {
 
 	_, s := e.serialize()
 	e1 := Entry{}
-	e1.deserialize(s)
+	e1.deserialize(bufio.NewReader(bytes.NewBuffer(s)))
 
 	if !reflect.DeepEqual(e, e1) {
 		t.Errorf("Deserialized struct does not match original.\n Expected \n%v \n got \n%v", e, e1)
@@ -73,7 +74,7 @@ func TestSerializeDeserialize(t *testing.T) {
 
 	_, s := e.serialize()
 	e1 := Entry{}
-	e1.deserialize(s)
+	e1.deserialize(bufio.NewReader(bytes.NewBuffer(s)))
 
 	if !reflect.DeepEqual(e, e1) {
 		t.Errorf("Deserialized struct does not match original.\n Expected \n%v \n got \n%v", e, e1)
