@@ -82,59 +82,25 @@ func (reader *SSTableReader) peekNextId() ([]byte, error) {
 
 func (reader *SSTableReader) readNextEntry() (Entry, error) {
 	blockSize := 100
-
-	idSize := make([]byte, 1)
-
 	for { //If the size is 0, it's padding in a block. Keep looking until a new block or EOF
-		_, err := reader.buffer.Read(idSize)
+		idSize, err := reader.buffer.Peek(1)
 
 		if err != nil {
 			return Entry{}, err
 		}
 
-		if idSize[0] != byte(0) {
-			//Try to read next block into buffer
-			reader.buffer.Peek(blockSize)
-			break
-		} else {
+		if idSize[0] == byte(0) {
+			reader.buffer.ReadByte() //Consume the zero byte
 			continue
 		}
+
+		reader.buffer.Peek(blockSize)
+		break
 	}
-
-	id := make([]byte, int(idSize[0]))
-	_, err := reader.buffer.Read(id)
-	if err != nil {
-		return Entry{}, err
-	}
-
-	deleted := make([]byte, 1)
-	_, err = reader.buffer.Read(deleted)
-	if err != nil {
-		return Entry{}, err
-	}
-
-	valueLength := make([]byte, 1)
-	_, err = reader.buffer.Read(valueLength)
-	if err != nil {
-		return Entry{}, err
-	}
-
-	value := make([]byte, valueLength[0])
-	_, err = reader.buffer.Read(value)
-
-	if err != nil {
-		return Entry{}, err
-	}
-
-	all := []byte{}
-	all = append(all, idSize...)
-	all = append(all, id...)
-	all = append(all, deleted...)
-	all = append(all, valueLength...)
-	all = append(all, value...)
 
 	entry := Entry{}
-	entry.deserialize(all)
+	entry.deserialize(reader.buffer)
+
 	return entry, nil
 }
 
