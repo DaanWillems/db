@@ -3,7 +3,23 @@ package storage
 import (
 	"bytes"
 	"fmt"
+	"os"
 )
+
+func shouldCompactL0() bool {
+	var byteSize int64
+	byteSize = 0
+	//Check if we should compact
+	for _, path := range fileManager.getDataIndex()[0] { //Check level 0
+		file, err := os.Stat(path)
+		if err != nil {
+			return false
+		}
+
+		byteSize += file.Size()
+	}
+	return byteSize > int64(config.Level0CompactionTriggerSize)
+}
 
 func getNextEntry(readers []*SSTableReader) (*Entry, []*SSTableReader) {
 	var min []byte
@@ -47,7 +63,8 @@ func compactNSSTables(inputs []*SSTableReader, level int) ([]string, error) {
 
 	for {
 		entry, emptyReaders := getNextEntry(inputs)
-		output.writeSingleEntry(entry)
+		size, serialized_entry := entry.serialize()
+		output.writeSingleEntry(&serialized_entry, size)
 
 		for _, emptyReader := range emptyReaders {
 			for index, reader := range inputs {
@@ -71,7 +88,8 @@ func compactNSSTables(inputs []*SSTableReader, level int) ([]string, error) {
 					if err != nil {
 						return nil, err
 					}
-					output.writeSingleEntry(&entry)
+					size, serialized_entry := entry.serialize()
+					output.writeSingleEntry(&serialized_entry, size)
 				}
 			}
 		}

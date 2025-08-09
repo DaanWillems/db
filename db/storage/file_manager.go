@@ -43,15 +43,15 @@ func initFileManager(rootPath string) error {
 		ledger:         map[int][]string{},
 	}
 	err := os.RemoveAll(rootPath) //Temporary for testing
-	err = os.Mkdir(rootPath, 0644)
-	err = os.Mkdir(rootPath+"/tmp", 0644)
+	err = os.Mkdir(rootPath, 0744)
+	err = os.Mkdir(rootPath+"/tmp", 0744)
 	if err != nil {
 		return err
 	}
 
 	for i := range config.CompactionLevels {
 		subPath := fmt.Sprintf("%v/%v", rootPath, i)
-		err := os.Mkdir(subPath, 0644)
+		err := os.Mkdir(subPath, 0744)
 		if err != nil {
 			return err
 		}
@@ -90,7 +90,7 @@ func (fileManager *FileManager) openWriteFile(path string) (*os.File, error) {
 	if val, ok := fileManager.openWriteFiles[path]; ok {
 		return val, nil
 	}
-	fd, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0644)
+	fd, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0777)
 
 	if err != nil {
 		return nil, err
@@ -134,13 +134,11 @@ func (fileManager *FileManager) storeMemtable(memtable *Memtable) {
 		panic("databaseFileStructure is not loaded")
 	}
 
-	fileName := fmt.Sprintf("%v.sst", len(fileManager.ledger[0])) //TODO: Generate new file name appropriately
-	writer := newSSTableWriterFromPath(fmt.Sprintf("./%v/0/%v", config.DataDirectory, fileName))
-	err := writer.writeFromMemtable(memtable)
+	// fileName := fmt.Sprintf("%v.sst", len(fileManager.ledger[0])) //TODO: Generate new file name appropriately
+	// writer := newSSTableWriterFromPath(fmt.Sprintf("./%v/0/%v", config.DataDirectory, fileName))
+	err := currentWriter.writeFromMemtable(memtable)
 
 	if err != nil {
 		panic(err)
 	}
-
-	fileManager.addFileToLedger(fileName, 0)
 }
