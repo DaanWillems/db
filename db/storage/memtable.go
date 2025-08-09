@@ -10,7 +10,8 @@ import (
 )
 
 type Memtable struct {
-	entries *list.List
+	entries       *list.List
+	totalByteSize int
 }
 
 type Entry struct {
@@ -77,7 +78,8 @@ func (entry *Entry) serialize() (int, []byte) {
 
 func newMemtable() Memtable {
 	return Memtable{
-		entries: list.New(),
+		entries:       list.New(),
+		totalByteSize: 0,
 	}
 }
 
@@ -101,6 +103,8 @@ func (m *Memtable) update(id []byte, value []byte) {
 
 	for e := m.entries.Front(); e != nil; e = e.Next() {
 		if bytes.Equal(e.Value.(Entry).id, id) {
+			oldSize := len(e.Value.(Entry).id) + len(e.Value.(Entry).value)
+			m.totalByteSize += oldSize - (len(entry.id) + len(entry.value))
 			e.Value = entry
 			return
 		}
@@ -112,10 +116,12 @@ func (m *Memtable) insert(entry Entry) {
 		next := e.Next()
 		if next != nil && bytes.Compare(entry.id, next.Value.(Entry).id) == -1 {
 			m.entries.InsertBefore(entry, next)
+			m.totalByteSize += len(entry.id) + len(entry.value)
 			return
 		}
 	}
 
+	m.totalByteSize += len(entry.id) + len(entry.value)
 	m.entries.PushBack(entry)
 }
 

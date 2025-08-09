@@ -13,18 +13,18 @@ func TestFullCompaction(t *testing.T) {
 	err := os.Mkdir("tmp", 0700)
 
 	InitializeStorageEngine(Config{
-		MemtableSize:  50,
-		DataDirectory: "./tmp",
-		BlockSize:     100,
+		MemtableFlushSize: 50,
+		DataDirectory:     "./tmp",
+		BlockSize:         100,
 	})
 	panicIfErr(err)
 
 	for id := range 50 {
-		Insert(id, IntToBytes(id))
+		Insert(IntToBytes(id), IntToBytes(id))
 	}
 
 	for id := range 50 {
-		Insert(id, IntToBytes(id))
+		Insert(IntToBytes(id), IntToBytes(id))
 	}
 
 	index := fileManager.getDataIndex()
@@ -66,22 +66,22 @@ func TestTripleCompaction(t *testing.T) {
 	err := os.Mkdir("tmp", 0700)
 
 	InitializeStorageEngine(Config{
-		MemtableSize:  50,
-		DataDirectory: "./tmp",
-		BlockSize:     100,
+		MemtableFlushSize: 50,
+		DataDirectory:     "./tmp",
+		BlockSize:         100,
 	})
 	panicIfErr(err)
 
 	for id := range 50 {
-		Insert(id, IntToBytes(id))
+		Insert(IntToBytes(id), IntToBytes(id))
 	}
 
 	for id := range 50 {
-		Insert(id, IntToBytes(id))
+		Insert(IntToBytes(id), IntToBytes(id))
 	}
 
 	for id := range 50 {
-		Insert(id, IntToBytes(id))
+		Insert(IntToBytes(id), IntToBytes(id))
 	}
 
 	index := fileManager.getDataIndex()
@@ -124,9 +124,9 @@ func TestUpdateCompaction(t *testing.T) {
 	err := os.Mkdir("tmp", 0700)
 
 	InitializeStorageEngine(Config{
-		MemtableSize:  50,
-		DataDirectory: "./tmp",
-		BlockSize:     100,
+		MemtableFlushSize: 50,
+		DataDirectory:     "./tmp",
+		BlockSize:         100,
 	})
 	panicIfErr(err)
 
@@ -177,14 +177,14 @@ func TestNoCompaction(t *testing.T) {
 	err := os.Mkdir("tmp", 0700)
 
 	InitializeStorageEngine(Config{
-		MemtableSize:  50,
-		DataDirectory: "./tmp",
-		BlockSize:     100,
+		MemtableFlushSize: 50,
+		DataDirectory:     "./tmp",
+		BlockSize:         100,
 	})
 	panicIfErr(err)
 
 	for id := range 100 {
-		Insert(id, IntToBytes(id))
+		Insert(IntToBytes(id), IntToBytes(id))
 	}
 
 	index := fileManager.getDataIndex()

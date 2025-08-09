@@ -13,13 +13,16 @@ func main() {
 	os.Mkdir("./data", 0700)
 
 	storage.InitializeStorageEngine(storage.Config{
-		MemtableSize:  500,
-		DataDirectory: "data",
-		BlockSize:     100,
+		MemtableFlushSize:           500000,
+		DataDirectory:               "data",
+		BlockSize:                   10000,
+		Level0CompactionTriggerSize: 5225349, //In bytes
+		CompactionFactor:            10,
+		CompactionLevels:            5,
 	})
 
-	for i := range 1000 {
-		storage.Insert(i, storage.IntToBytes(i))
+	for i := range 10000 {
+		storage.Insert(storage.IntToBytes(i), make([]byte, 500))
 	}
 
 	result, _ := storage.Query(storage.IntToBytes(21))

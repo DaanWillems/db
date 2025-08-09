@@ -2,6 +2,7 @@ package storage
 
 import (
 	"bytes"
+	"fmt"
 )
 
 func getNextEntry(readers []*SSTableReader) (*Entry, []*SSTableReader) {
@@ -39,7 +40,11 @@ func getNextEntry(readers []*SSTableReader) (*Entry, []*SSTableReader) {
 	return &entry, emptyReaders
 }
 
-func compactNSSTables(inputs []*SSTableReader, output *SSTableWriter) error {
+// TODO: Write to temp files during compaction, and copy over atomatically
+// Returns a sorted list of paths to files
+func compactNSSTables(inputs []*SSTableReader, level int) ([]string, error) {
+	output := newSSTableWriterFromPath(fmt.Sprintf("%v/tmp/%v", config.DataDirectory, fileManager.getNextFilename())) //TODO:Generate new file name
+
 	for {
 		entry, emptyReaders := getNextEntry(inputs)
 		output.writeSingleEntry(entry)
@@ -54,17 +59,17 @@ func compactNSSTables(inputs []*SSTableReader, output *SSTableWriter) error {
 		}
 
 		if len(inputs) == 0 {
-			return nil
+			return []string{output.path}, nil
 		}
 		if len(inputs) == 1 {
 			for _, remainder := range inputs {
 				for {
 					entry, err := remainder.readNextEntry()
 					if checkEOF(err) {
-						return nil
+						return []string{output.path}, nil
 					}
 					if err != nil {
-						return err
+						return nil, err
 					}
 					output.writeSingleEntry(&entry)
 				}

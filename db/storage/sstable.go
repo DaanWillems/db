@@ -11,6 +11,7 @@ import (
 type SSTableWriter struct {
 	buffer          *bufio.Writer
 	currentBlockLen int //The length of the current block we're writing to
+	path            string
 }
 
 type SSTableReader struct {
@@ -45,7 +46,11 @@ func newSSTableWriter(buffer *bufio.Writer) SSTableWriter {
 func newSSTableWriterFromPath(path string) SSTableWriter {
 	fd, err := fileManager.openWriteFile(path)
 	panicIfErr(err)
-	return newSSTableWriter(bufio.NewWriter(fd))
+	return SSTableWriter{
+		buffer:          bufio.NewWriter(fd),
+		currentBlockLen: 0,
+		path:            path,
+	}
 }
 
 func (reader *SSTableReader) peekNextId() ([]byte, error) {
@@ -129,7 +134,10 @@ func (writer *SSTableWriter) writeSingleEntry(entry *Entry) error {
 func (writer *SSTableWriter) writeFromMemtable(memtable *Memtable) error {
 	for e := memtable.entries.Front(); e != nil; e = e.Next() {
 		entry := e.Value.(Entry)
-		writer.writeSingleEntry(&entry)
+		err := writer.writeSingleEntry(&entry)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
