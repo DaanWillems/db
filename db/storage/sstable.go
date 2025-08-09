@@ -4,13 +4,16 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
+	"log"
 	"os"
 )
 
 type SSTableWriter struct {
 	buffer          *bufio.Writer
 	currentBlockLen int //The length of the current block we're writing to
+	currentBlock    int //The current block we're writing to
 	path            string
 }
 
@@ -20,26 +23,12 @@ type SSTableReader struct {
 	file      *os.File
 }
 
-func newSSTableReader(rawBuffer *bytes.Buffer) SSTableReader {
-	return SSTableReader{
-		buffer:    bufio.NewReader(rawBuffer),
-		rawBuffer: rawBuffer,
-	}
-}
-
 func newSSTableReaderFromPath(path string) SSTableReader {
 	fd, err := fileManager.openReadFile(path)
 	panicIfErr(err)
 	return SSTableReader{
 		buffer: bufio.NewReader(fd),
 		file:   fd,
-	}
-}
-
-func newSSTableWriter(buffer *bufio.Writer) SSTableWriter {
-	return SSTableWriter{
-		buffer:          buffer,
-		currentBlockLen: 0,
 	}
 }
 
@@ -53,8 +42,32 @@ func newSSTableWriterFromPath(path string) SSTableWriter {
 	}
 }
 
-func (reader *SSTableReader) peekNextId() ([]byte, error) {
+func (reader *SSTableReader) getLastId() ([]byte, error) {
+	//Calculate location for last block
+	offset := int64(config.BlockSize * (config.SSTableBlockCount - 1))
+	content := make([]byte, config.BlockSize)
+	reader.file.ReadAt(content, offset)
 
+	buffer := bufio.NewReader(bytes.NewBuffer(content))
+	lastEntry := Entry{}
+	for { //If the size is 0, the block is done:
+		entry := Entry{}
+		err := entry.deserialize(buffer)
+		if errors.Is(err, io.ErrUnexpectedEOF) {
+			return lastEntry.id, nil
+		}
+		if checkEOF(err) {
+			return lastEntry.id, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		lastEntry = entry
+	}
+}
+
+func (reader *SSTableReader) peekNextId() ([]byte, error) {
 	pos := 1
 	var idSize int
 
@@ -105,27 +118,32 @@ func (reader *SSTableReader) readNextEntry() (Entry, error) {
 	return entry, nil
 }
 
-func (writer *SSTableWriter) writeSingleEntry(entry *Entry) error {
-	size, serialized_entry := entry.serialize()
-	//Check to see if there is enough place in the block to add the entry
-	if size > (config.BlockSize - writer.currentBlockLen) {
-		if size > config.BlockSize {
-			//Will never fit
-			return errors.New("entry larger than max block size")
-		}
+func (writer *SSTableWriter) spaceAvailableInBlock(size int) bool {
+	return (config.BlockSize - writer.currentBlockLen) >= size
+}
 
-		//Pad remainder of block
-		padding := config.BlockSize - writer.currentBlockLen
-		// log.Printf("About to write padding %v", padding)
+func (writer *SSTableWriter) padBlock() {
+	padding := config.BlockSize - writer.currentBlockLen
+	// log.Printf("About to write padding %v", padding)
 
-		_, err := writer.buffer.Write(make([]byte, padding))
-		panicIfErr(err)
+	_, err := writer.buffer.Write(make([]byte, padding))
+	if err != nil {
+		panic(err)
+	}
 
-		writer.currentBlockLen = 0
+	writer.currentBlockLen = 0
+	writer.currentBlock++
+	log.Printf("Padded and new block count is %d", writer.currentBlock)
+}
+
+func (writer *SSTableWriter) writeSingleEntry(entry *[]byte, size int) error {
+	if size > config.BlockSize {
+		//Will never fit
+		return errors.New("entry larger than max block size")
 	}
 
 	writer.currentBlockLen += size
-	_, err := writer.buffer.Write(serialized_entry)
+	_, err := writer.buffer.Write(*entry)
 	panicIfErr(err)
 	writer.buffer.Flush()
 	return nil
@@ -134,7 +152,16 @@ func (writer *SSTableWriter) writeSingleEntry(entry *Entry) error {
 func (writer *SSTableWriter) writeFromMemtable(memtable *Memtable) error {
 	for e := memtable.entries.Front(); e != nil; e = e.Next() {
 		entry := e.Value.(Entry)
-		err := writer.writeSingleEntry(&entry)
+		size, serialized_entry := entry.serialize()
+		if !writer.spaceAvailableInBlock(size) {
+			writer.padBlock()
+		}
+		if writer.currentBlock >= config.SSTableBlockCount {
+			fileName := fileManager.getNextFilename()
+			currentWriter = newSSTableWriterFromPath(fmt.Sprintf("%v/%v/%v", config.DataDirectory, "0", fileName))
+			fileManager.addFileToLedger(fileName, 0)
+		}
+		err := writer.writeSingleEntry(&serialized_entry, size)
 		if err != nil {
 			return err
 		}

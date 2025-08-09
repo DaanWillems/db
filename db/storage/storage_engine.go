@@ -3,7 +3,6 @@ package storage
 import (
 	"fmt"
 	"log"
-	"os"
 )
 
 type Config struct {
@@ -17,6 +16,7 @@ type Config struct {
 }
 
 var memtable Memtable
+var currentWriter SSTableWriter
 var config Config
 
 func InitializeStorageEngine(cfg Config) {
@@ -25,6 +25,10 @@ func InitializeStorageEngine(cfg Config) {
 	initFileManager(cfg.DataDirectory)
 	replayWal(fmt.Sprintf("./%v/wal", cfg.DataDirectory))
 	openWAL(fmt.Sprintf("./%v/wal", cfg.DataDirectory))
+
+	fileName := fileManager.getNextFilename()
+	currentWriter = newSSTableWriterFromPath(fmt.Sprintf("%v/%v/%v", config.DataDirectory, "0", fileName))
+	fileManager.addFileToLedger(fileName, 0)
 }
 
 func Close() {
@@ -40,41 +44,29 @@ func Insert(id []byte, value []byte) error {
 
 	writeEntryToWal(entry)
 	memtable.insert(entry)
+
 	if memtable.totalByteSize >= config.MemtableFlushSize {
 		fileManager.storeMemtable(&memtable)
 		memtable = newMemtable() // Reset memtable after flushing
 		resetWAL()               //Discard the WAL
 
-		var byteSize int64
-		byteSize = 0
-		//Check if we should compact
-		for _, path := range fileManager.getDataIndex()[0] { //Check level 0
-			file, err := os.Stat(path)
-			if err != nil {
-				return err
-			}
-
-			byteSize += file.Size()
-		}
-
-		if byteSize > int64(config.Level0CompactionTriggerSize) {
-			log.Printf("Should compact because size is %v\n", byteSize)
-
+		if shouldCompactL0() {
+			log.Println("Compacting L0")
 			readers := []*SSTableReader{}
 			for _, path := range fileManager.getDataIndex()[0] { //Get L0 files
 				reader := newSSTableReaderFromPath(path)
 				readers = append(readers, &reader)
 			}
 
-			//Find overlapping L1 files
+			lastId, err := readers[len(readers)-1].getLastId()
+			if err != nil {
+				log.Println(err)
+				return nil
+			}
+			log.Printf("Last ID: %v\n", lastId)
 
 			paths, _ := compactNSSTables(readers, 1)
 			log.Println(paths)
-			for _, path := range fileManager.getDataIndex()[0] { //Get L0 files
-				os.RemoveAll(path) //TODO: Do this properly
-			}
-		} else {
-			log.Printf("Should not compact because size is %v\n", byteSize)
 		}
 	}
 
