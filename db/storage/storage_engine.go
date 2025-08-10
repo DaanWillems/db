@@ -50,7 +50,6 @@ func Insert(id []byte, value []byte) error {
 		fileManager.storeMemtable(&memtable)
 		memtable = newMemtable() // Reset memtable after flushing
 		resetWAL()               //Discard the WAL
-
 		// if shouldCompactL0() {
 		// 	log.Println("Compacting L0")
 		// 	readers := []*SSTableReader{}
