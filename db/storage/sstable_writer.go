@@ -1,0 +1,76 @@
+package storage
+
+import (
+	"bufio"
+	"errors"
+	"fmt"
+	"log"
+)
+
+type SSTableWriter struct {
+	buffer          *bufio.Writer
+	currentBlockLen int //The length of the current block we're writing to
+	currentBlock    int //The current block we're writing to
+	path            string
+}
+
+func newSSTableWriterFromPath(path string) SSTableWriter {
+	fd, err := fileManager.openWriteFile(path)
+	panicIfErr(err)
+	return SSTableWriter{
+		buffer:          bufio.NewWriter(fd),
+		currentBlockLen: 0,
+		path:            path,
+	}
+}
+
+func (writer *SSTableWriter) spaceAvailableInBlock(size int) bool {
+	return (config.BlockSize - writer.currentBlockLen) >= size
+}
+
+func (writer *SSTableWriter) padBlock() {
+	padding := config.BlockSize - writer.currentBlockLen
+	// log.Printf("About to write padding %v", padding)
+
+	_, err := writer.buffer.Write(make([]byte, padding))
+	if err != nil {
+		panic(err)
+	}
+
+	writer.currentBlockLen = 0
+	writer.currentBlock++
+	log.Printf("Padded and new block count is %d", writer.currentBlock)
+}
+
+func (writer *SSTableWriter) writeSingleEntry(entry *[]byte, size int) error {
+	if size > config.BlockSize {
+		//Will never fit
+		return errors.New("entry larger than max block size")
+	}
+
+	writer.currentBlockLen += size
+	_, err := writer.buffer.Write(*entry)
+	panicIfErr(err)
+	writer.buffer.Flush()
+	return nil
+}
+
+func (writer *SSTableWriter) writeFromMemtable(memtable *Memtable) error {
+	for e := memtable.entries.Front(); e != nil; e = e.Next() {
+		entry := e.Value.(Entry)
+		size, serialized_entry := entry.serialize()
+		if !writer.spaceAvailableInBlock(size) {
+			writer.padBlock()
+		}
+		if writer.currentBlock >= config.SSTableBlockCount {
+			fileName := fileManager.getNextFilename()
+			currentWriter = newSSTableWriterFromPath(fmt.Sprintf("%v/%v/%v", config.DataDirectory, "0", fileName))
+			fileManager.addFileToLedger(fileName, 0)
+		}
+		err := writer.writeSingleEntry(&serialized_entry, size)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}

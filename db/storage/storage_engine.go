@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 )
@@ -50,24 +51,24 @@ func Insert(id []byte, value []byte) error {
 		memtable = newMemtable() // Reset memtable after flushing
 		resetWAL()               //Discard the WAL
 
-		if shouldCompactL0() {
-			log.Println("Compacting L0")
-			readers := []*SSTableReader{}
-			for _, path := range fileManager.getDataIndex()[0] { //Get L0 files
-				reader := newSSTableReaderFromPath(path)
-				readers = append(readers, &reader)
-			}
+		// if shouldCompactL0() {
+		// 	log.Println("Compacting L0")
+		// 	readers := []*SSTableReader{}
+		// 	for _, path := range fileManager.getDataIndex()[0] { //Get L0 files
+		// 		reader := newSSTableReaderFromPath(path)
+		// 		readers = append(readers, &reader)
+		// 	}
 
-			lastId, err := readers[len(readers)-1].getLastId()
-			if err != nil {
-				log.Println(err)
-				return nil
-			}
-			log.Printf("Last ID: %v\n", lastId)
+		// 	lastId, err := readers[len(readers)-1].getLastId()
+		// 	if err != nil {
+		// 		log.Println(err)
+		// 		return nil
+		// 	}
+		// 	log.Printf("Last ID: %v\n", lastId)
 
-			paths, _ := compactNSSTables(readers, 1)
-			log.Println(paths)
-		}
+		// paths, _ := compactNSSTables(readers, 1)
+		// log.Println(paths)
+		// }
 	}
 
 	return nil
@@ -84,20 +85,20 @@ func Query(id []byte) ([]byte, error) {
 	for index, paths := range fileManager.getDataIndex() {
 		log.Printf("Search level %v", index)
 		for _, path := range paths {
-			reader := newSSTableReaderFromPath(path)
-			entry, err := reader.scan(id)
+			it := NewSSTableBlockIteratorFromPath(path)
 
-			if err != nil {
-				panic(err)
+			for it.Next() {
+				blockIt := NewSSTableEntryIterator(it.Block())
+				for blockIt.Next() {
+					if bytes.Equal(blockIt.Entry().id, id) {
+						return blockIt.Entry().value, nil
+					}
+				}
+				if err := blockIt.Err(); err != nil {
+					log.Fatalf("Error iterating over entries: %v", err)
+				}
 			}
-
-			if entry == nil {
-				continue
-			}
-
-			return entry.value, nil
 		}
 	}
-
 	return nil, nil
 }

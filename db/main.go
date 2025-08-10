@@ -22,11 +22,11 @@ func main() {
 		CompactionLevels:            5,
 	})
 
-	for i := range 40 {
-		storage.Insert(storage.IntToBytes(i), make([]byte, 100))
+	for i := range 600 {
+		storage.Insert(storage.IntToBytes(i), storage.IntToBytes(i))
 	}
 
-	result, _ := storage.Query(storage.IntToBytes(499))
+	result, _ := storage.Query(storage.IntToBytes(300))
 	fmt.Printf("%08b\n", result)
 
 	//storage.Compact()

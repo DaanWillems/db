@@ -78,7 +78,7 @@ func replayWal(_wal_path string) {
 		}
 
 		entry := &Entry{}
-		entry.deserialize(bufio.NewReader(bytes.NewBuffer(content)))
+		entry.deserialize((bytes.NewBuffer(content)))
 
 		memtable.insert(*entry)
 	}
