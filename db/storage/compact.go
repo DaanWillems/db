@@ -1,6 +1,8 @@
 package storage
 
 import (
+	"bytes"
+	"fmt"
 	"os"
 )
 
@@ -19,9 +21,44 @@ func shouldCompactL0() bool {
 	return byteSize > int64(config.Level0CompactionTriggerSize)
 }
 
-// func compactNSSTables(inputs []*SSTableReader, level int) ([]string, error) {
+func compactNSSTables(inputs []*SSTableReader, level int) ([]string, error) {
+	state := []*SSTableIterator{}
+	output := newSSTableWriterFromPath(fmt.Sprintf("%v/tmp/%v", config.DataDirectory, fileManager.getNextFilename())) //TODO:Generate new file name
+	for _, input := range inputs {
+		it := NewSSTableIterator(input)
+		if ok := it.Next(); !ok {
+			continue
+		}
+		state = append(state, it)
+	}
+	var min []byte
 
-// }
+	outputReaders := []*SSTableIterator{}
+
+	for _, it := range state {
+		entry := it.Entry()
+		if entry == nil {
+			continue
+		}
+
+		if min == nil {
+			min = it.Entry().id
+		} else if bytes.Compare(it.Entry().id, min) == -1 {
+			min = it.Entry().id
+			outputReaders = append(outputReaders, it)
+		} else if bytes.Equal(it.Entry().id, min) {
+			outputReaders = append(outputReaders, it)
+		}
+	}
+
+	for _, it := range outputReaders {
+		output.writeSingleEntry(it.Entry())
+
+		if ok := it.Next(); !ok {
+			continue //Remove
+		}
+	}
+}
 
 // func getNextEntry(readers []*SSTableReader) (*Entry, []*SSTableReader) {
 // 	var min []byte

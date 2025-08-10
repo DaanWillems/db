@@ -42,13 +42,13 @@ func (writer *SSTableWriter) padBlock() {
 	log.Printf("Padded and new block count is %d", writer.currentBlock)
 }
 
-func (writer *SSTableWriter) writeSingleEntry(entry *[]byte, size int) error {
-	if size > config.BlockSize {
+func (writer *SSTableWriter) writeSingleEntry(entry *[]byte) error {
+	if len(*entry) > config.BlockSize {
 		//Will never fit
 		return errors.New("entry larger than max block size")
 	}
 
-	writer.currentBlockLen += size
+	writer.currentBlockLen += len(*entry)
 	_, err := writer.buffer.Write(*entry)
 	panicIfErr(err)
 	writer.buffer.Flush()
