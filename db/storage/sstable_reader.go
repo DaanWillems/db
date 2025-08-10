@@ -3,7 +3,6 @@ package storage
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 )
@@ -31,7 +30,9 @@ func (it *SSTableIterator) Entry() *Entry {
 }
 
 func (it *SSTableIterator) Next() bool {
+	//Load the iterator for the first block
 	if it.entryIterator == nil {
+		//If the first block does not exist, exit immediately
 		if result := it.blockIterator.Next(); !result {
 			return false
 		}
@@ -39,11 +40,14 @@ func (it *SSTableIterator) Next() bool {
 	}
 
 	foundEntry := it.entryIterator.Next()
+	//If no entry found, try loading the next block
 	if !foundEntry {
+		//No block? Exit now
 		if result := it.blockIterator.Next(); !result {
 			return false
 		} else {
 			it.entryIterator = NewSSTableEntryIterator(it.blockIterator.Block())
+			//Load the first entry from the next block. No entry? Exit immediately
 			if foundEntry := it.entryIterator.Next(); !foundEntry {
 				return false
 			}
@@ -51,9 +55,6 @@ func (it *SSTableIterator) Next() bool {
 	}
 
 	it.lastEntry = it.entryIterator.Entry()
-	if it.lastEntry.id == nil {
-		fmt.Printf("\n")
-	}
 	return true
 }
 
