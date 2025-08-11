@@ -21,116 +21,63 @@ func shouldCompactL0() bool {
 	return byteSize > int64(config.Level0CompactionTriggerSize)
 }
 
-func compactNSSTables(inputs []*SSTableReader, level int) ([]string, error) {
+func compactNSSTables(inputs []*SSTableIterator, level int) ([]string, error) {
 	state := []*SSTableIterator{}
-	output := newSSTableWriterFromPath(fmt.Sprintf("%v/tmp/%v", config.DataDirectory, fileManager.getNextFilename())) //TODO:Generate new file name
-	for _, input := range inputs {
-		it := NewSSTableIterator(input)
+	output := newSSTableWriterFromPath(fmt.Sprintf("%v/%v/%v", config.DataDirectory, level, fileManager.getNextFilename())) //TODO:Generate new file name
+
+	for _, it := range inputs {
 		if ok := it.Next(); !ok {
 			continue
 		}
 		state = append(state, it)
 	}
-	var min []byte
 
-	outputReaders := []*SSTableIterator{}
+	for {
+		var min []byte
+		outputIt := []*SSTableIterator{}
 
-	for _, it := range state {
-		entry := it.Entry()
-		if entry == nil {
-			continue
+		for _, it := range state {
+			entry := it.Entry()
+			if entry == nil {
+				continue
+			}
+
+			if min == nil {
+				min = it.Entry().id
+				outputIt = append(outputIt, it)
+			} else if bytes.Compare(it.Entry().id, min) == -1 {
+				min = it.Entry().id
+				outputIt = []*SSTableIterator{}
+				outputIt = append(outputIt, it)
+			} else if bytes.Equal(it.Entry().id, min) {
+				outputIt = append(outputIt, it)
+			}
 		}
 
-		if min == nil {
-			min = it.Entry().id
-		} else if bytes.Compare(it.Entry().id, min) == -1 {
-			min = it.Entry().id
-			outputReaders = append(outputReaders, it)
-		} else if bytes.Equal(it.Entry().id, min) {
-			outputReaders = append(outputReaders, it)
+		_, serialized_entry := outputIt[len(outputIt)-1].Entry().serialize()
+		output.writeSingleEntry(&serialized_entry)
+
+		for _, it := range outputIt {
+			if ok := it.Next(); !ok {
+				for idx, it2 := range state {
+					if it2 == it {
+						state = append(state[:idx], state[idx+1:]...)
+						break
+					}
+				}
+			}
 		}
-	}
-
-	for _, it := range outputReaders {
-		output.writeSingleEntry(it.Entry())
-
-		if ok := it.Next(); !ok {
-			continue //Remove
+		if len(state) == 0 {
+			return []string{output.path}, nil
+		}
+		if len(state) == 1 {
+			_, serialized_entry := state[0].Entry().serialize()
+			output.writeSingleEntry(&serialized_entry)
+			for state[0].Next() {
+				_, serialized_entry := state[0].Entry().serialize()
+				output.writeSingleEntry(&serialized_entry)
+			}
+			return []string{output.path}, nil
 		}
 	}
 }
-
-// func getNextEntry(readers []*SSTableReader) (*Entry, []*SSTableReader) {
-// 	var min []byte
-// 	outputReaders := []*SSTableReader{}
-// 	emptyReaders := []*SSTableReader{}
-
-// 	//Get reader with smallest key
-// 	//Its assumed that readers are ordered oldest to newest
-// 	for _, reader := range readers {
-// 		id, err := reader.peekNextId()
-// 		if checkEOF(err) {
-// 			emptyReaders = append(emptyReaders, reader)
-// 			continue
-// 		}
-
-// 		if min == nil {
-// 			min = id
-// 			outputReaders = append(outputReaders, reader)
-// 		} else if bytes.Compare(id, min) == -1 {
-// 			min = id
-// 			outputReaders := []*SSTableReader{}
-// 			outputReaders = append(outputReaders, reader)
-// 		} else if bytes.Equal(id, min) {
-// 			outputReaders = append(outputReaders, reader)
-// 		}
-// 	}
-
-// 	var entry Entry
-
-// 	for _, reader := range outputReaders {
-// 		entry, _ = reader.readNextEntry() //use the latest (most recent) newest entry
-// 	}
-
-// 	return &entry, emptyReaders
-// }
-
-// // TODO: Write to temp files during compaction, and copy over atomatically
-// // Returns a sorted list of paths to files
-// func compactNSSTables(inputs []*SSTableReader, level int) ([]string, error) {
-// 	output := newSSTableWriterFromPath(fmt.Sprintf("%v/tmp/%v", config.DataDirectory, fileManager.getNextFilename())) //TODO:Generate new file name
-
-// 	for {
-// 		entry, emptyReaders := getNextEntry(inputs)
-// 		size, serialized_entry := entry.serialize()
-// 		output.writeSingleEntry(&serialized_entry, size)
-
-// 		for _, emptyReader := range emptyReaders {
-// 			for index, reader := range inputs {
-// 				if reader == emptyReader {
-// 					//Remove from map
-// 					inputs = append(inputs[:index], inputs[index+1:]...)
-// 				}
-// 			}
-// 		}
-
-// 		if len(inputs) == 0 {
-// 			return []string{output.path}, nil
-// 		}
-// 		if len(inputs) == 1 {
-// 			for _, remainder := range inputs {
-// 				for {
-// 					entry, err := remainder.readNextEntry()
-// 					if checkEOF(err) {
-// 						return []string{output.path}, nil
-// 					}
-// 					if err != nil {
-// 						return nil, err
-// 					}
-// 					size, serialized_entry := entry.serialize()
-// 					output.writeSingleEntry(&serialized_entry, size)
-// 				}
-// 			}
-// 		}
-// 	}
-// }

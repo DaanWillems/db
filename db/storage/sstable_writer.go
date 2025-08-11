@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"log"
 )
 
 type SSTableWriter struct {
@@ -30,7 +29,6 @@ func (writer *SSTableWriter) spaceAvailableInBlock(size int) bool {
 
 func (writer *SSTableWriter) padBlock() {
 	padding := config.BlockSize - writer.currentBlockLen
-	// log.Printf("About to write padding %v", padding)
 
 	_, err := writer.buffer.Write(make([]byte, padding))
 	if err != nil {
@@ -39,13 +37,16 @@ func (writer *SSTableWriter) padBlock() {
 
 	writer.currentBlockLen = 0
 	writer.currentBlock++
-	log.Printf("Padded and new block count is %d", writer.currentBlock)
 }
 
 func (writer *SSTableWriter) writeSingleEntry(entry *[]byte) error {
 	if len(*entry) > config.BlockSize {
 		//Will never fit
 		return errors.New("entry larger than max block size")
+	}
+
+	if !writer.spaceAvailableInBlock(len(*entry)) {
+		writer.padBlock()
 	}
 
 	writer.currentBlockLen += len(*entry)
@@ -58,16 +59,13 @@ func (writer *SSTableWriter) writeSingleEntry(entry *[]byte) error {
 func (writer *SSTableWriter) writeFromMemtable(memtable *Memtable) error {
 	for e := memtable.entries.Front(); e != nil; e = e.Next() {
 		entry := e.Value.(Entry)
-		size, serialized_entry := entry.serialize()
-		if !writer.spaceAvailableInBlock(size) {
-			writer.padBlock()
-		}
+		_, serialized_entry := entry.serialize()
 		if writer.currentBlock >= config.SSTableBlockCount {
 			fileName := fileManager.getNextFilename()
 			currentWriter = newSSTableWriterFromPath(fmt.Sprintf("%v/%v/%v", config.DataDirectory, "0", fileName))
 			fileManager.addFileToLedger(fileName, 0)
 		}
-		err := writer.writeSingleEntry(&serialized_entry, size)
+		err := writer.writeSingleEntry(&serialized_entry)
 		if err != nil {
 			return err
 		}

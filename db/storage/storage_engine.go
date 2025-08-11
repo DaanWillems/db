@@ -36,6 +36,34 @@ func Close() {
 	fileManager.close()
 }
 
+func compact() {
+	log.Println("Compacting L0")
+	readers := []*SSTableIterator{}
+	index := fileManager.getDataIndex()
+
+	L0minID, _ := newSSTableScannerFromPath(index[0][0]).getFirstID()
+	L0maxID, _ := newSSTableScannerFromPath(index[0][len(index[0])-1]).getLastID()
+
+	for _, path := range index[0] { //Get L0 files
+		reader := NewSSTableIteratorFromPath(path)
+		readers = append(readers, reader)
+	}
+
+	for _, path := range index[1] { //Get L1 files
+		scanner := newSSTableScannerFromPath(path)
+		minID, _ := scanner.getFirstID()
+		maxID, _ := scanner.getLastID()
+
+		if bytes.Compare(maxID, L0maxID) == -1 || bytes.Compare(minID, L0minID) == 1 {
+			reader := NewSSTableIteratorFromPath(path)
+			readers = append(readers, reader)
+		}
+	}
+
+	paths, _ := compactNSSTables(readers, 1)
+	log.Printf("I have compacted the following files: %v Into: %v", readers, paths)
+}
+
 func Insert(id []byte, value []byte) error {
 	entry := Entry{
 		id:      id,
@@ -50,24 +78,9 @@ func Insert(id []byte, value []byte) error {
 		fileManager.storeMemtable(&memtable)
 		memtable = newMemtable() // Reset memtable after flushing
 		resetWAL()               //Discard the WAL
-		// if shouldCompactL0() {
-		// 	log.Println("Compacting L0")
-		// 	readers := []*SSTableReader{}
-		// 	for _, path := range fileManager.getDataIndex()[0] { //Get L0 files
-		// 		reader := newSSTableReaderFromPath(path)
-		// 		readers = append(readers, &reader)
-		// 	}
-
-		// 	lastId, err := readers[len(readers)-1].getLastId()
-		// 	if err != nil {
-		// 		log.Println(err)
-		// 		return nil
-		// 	}
-		// 	log.Printf("Last ID: %v\n", lastId)
-
-		// paths, _ := compactNSSTables(readers, 1)
-		// log.Println(paths)
-		// }
+		if shouldCompactL0() {
+			compact()
+		}
 	}
 
 	return nil
@@ -84,18 +97,13 @@ func Query(id []byte) ([]byte, error) {
 	for index, paths := range fileManager.getDataIndex() {
 		log.Printf("Search level %v", index)
 		for _, path := range paths {
-			it := NewSSTableBlockIteratorFromPath(path)
-
-			for it.Next() {
-				blockIt := NewSSTableEntryIterator(it.Block())
-				for blockIt.Next() {
-					if bytes.Equal(blockIt.Entry().id, id) {
-						return blockIt.Entry().value, nil
-					}
-				}
-				if err := blockIt.Err(); err != nil {
-					log.Fatalf("Error iterating over entries: %v", err)
-				}
+			scanner := newSSTableScannerFromPath(path)
+			entry, err := scanner.scan(id)
+			if err != nil {
+				log.Fatalf("Error iterating over entries: %v", err)
+			}
+			if entry != nil {
+				return entry.value, nil
 			}
 		}
 	}

@@ -42,12 +42,12 @@ func initFileManager(rootPath string) error {
 		openWriteFiles: map[string]*os.File{},
 		ledger:         map[int][]string{},
 	}
-	err := os.RemoveAll(rootPath) //Temporary for testing
-	err = os.Mkdir(rootPath, 0744)
-	err = os.Mkdir(rootPath+"/tmp", 0744)
-	if err != nil {
-		return err
-	}
+	// err := os.RemoveAll(rootPath) //Temporary for testing
+	os.Mkdir(rootPath, 0744)
+	os.Mkdir(rootPath+"/tmp", 0744)
+	// if err != nil {
+	// 	return err
+	// }
 
 	for i := range config.CompactionLevels {
 		subPath := fmt.Sprintf("%v/%v", rootPath, i)

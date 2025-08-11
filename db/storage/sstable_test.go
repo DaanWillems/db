@@ -2,6 +2,7 @@ package storage
 
 import (
 	"bufio"
+	"bytes"
 	"log"
 	"os"
 	"testing"
@@ -25,26 +26,31 @@ func TestSSTable(t *testing.T) {
 		currentBlockLen: 0,
 		path:            "./tmp/data.sst",
 	}
+
 	for e := memtable.entries.Front(); e != nil; e = e.Next() {
 		entry := e.Value.(Entry)
-		size, serialized_entry := entry.serialize()
-		if !writer.spaceAvailableInBlock(size) {
-			writer.padBlock()
-		}
-		writer.writeSingleEntry(&serialized_entry, size)
+		_, serialized_entry := entry.serialize()
+		writer.writeSingleEntry(&serialized_entry)
 	}
 
 	fd, err := os.Open("./tmp/data.sst")
-	panicIfErr(err)
+	if err != nil {
+		log.Fatal(err)
+	}
 	fileInfo, err := fd.Stat()
-	panicIfErr(err)
+	if err != nil {
+		log.Fatal(err)
+	}
 	reader := SSTableReader{
 		fileSize: fileInfo.Size(),
 		file:     fd,
 	}
 	it := NewSSTableIterator(&reader)
-	for it.Next() {
-		log.Printf("Entry: %v", it.Entry())
+	for id := range 50 {
+		it.Next()
+		if !bytes.Equal(it.Entry().value, IntToBytes(id)) {
+			t.Error("Value does not match")
+		}
 	}
 }
 

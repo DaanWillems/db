@@ -4,20 +4,19 @@ import (
 	storage "db/storage"
 	"fmt"
 	"log"
-	"os"
 )
 
 func main() {
 	log.Println("Starting...")
-	os.RemoveAll("./data")
-	os.Mkdir("./data", 0700)
+	// os.RemoveAll("./data")
+	// os.Mkdir("./data", 0700)
 
 	storage.InitializeStorageEngine(storage.Config{
 		MemtableFlushSize:           500,
 		DataDirectory:               "./data",
 		BlockSize:                   200,
 		SSTableBlockCount:           10,
-		Level0CompactionTriggerSize: 5, //In bytes
+		Level0CompactionTriggerSize: 6298, //In bytes
 		CompactionFactor:            10,
 		CompactionLevels:            5,
 	})
@@ -29,6 +28,5 @@ func main() {
 	result, _ := storage.Query(storage.IntToBytes(300))
 	fmt.Printf("%08b\n", result)
 
-	//storage.Compact()
 	storage.Close()
 }

@@ -1,21 +1,23 @@
 package storage
 
-// import (
-// 	"fmt"
-// 	"os"
-// 	"reflect"
-// 	"testing"
-// )
+import (
+	"fmt"
+	"os"
+	"reflect"
+	"testing"
+)
 
-// // Combine two indentical SSTables into 1
+// Combine two indentical SSTables into 1
 // func TestFullCompaction(t *testing.T) {
 // 	os.RemoveAll("./tmp")
 // 	err := os.Mkdir("tmp", 0700)
 
 // 	InitializeStorageEngine(Config{
-// 		MemtableFlushSize: 50,
+// 		MemtableFlushSize: 400,
 // 		DataDirectory:     "./tmp",
-// 		BlockSize:         100,
+// 		BlockSize:         11,
+// 		CompactionLevels:  5,
+// 		SSTableBlockCount: 49,
 // 	})
 // 	panicIfErr(err)
 
@@ -29,17 +31,27 @@ package storage
 
 // 	index := fileManager.getDataIndex()
 
-// 	if len(index) < 2 {
+// 	if len(index[0]) < 2 {
 // 		return
 // 	}
 
-// 	r1 := newSSTableReaderFromPath(fmt.Sprintf("./tmp/%v", index[0]))
-// 	r2 := newSSTableReaderFromPath(fmt.Sprintf("./tmp/%v", index[1]))
-// 	w1 := newSSTableWriterFromPath("./tmp/output")
+// 	r1 := NewSSTableIteratorFromPath(fmt.Sprintf("%v", index[0][0]))
+// 	r2 := NewSSTableIteratorFromPath(fmt.Sprintf("%v", index[0][1]))
 
-// 	compactNSSTables([]*SSTableReader{&r1, &r2}, &w1)
+// 	paths, _ := compactNSSTables([]*SSTableIterator{r1, r2}, 0)
 
-// 	reader := newSSTableReaderFromPath("./tmp/output")
+// 	it := NewSSTableIteratorFromPath(paths[0])
+
+// 	count := 0
+// 	for it.Next() {
+// 		count++
+// 	}
+
+// 	if count != 50 {
+// 		t.Errorf("Count is incorrect. Expected %v, got %v", 50, count)
+// 	}
+
+// 	reader := newSSTableScannerFromPath(paths[0])
 
 // 	for id := range 50 {
 // 		result, _ := reader.scan(IntToBytes(id))
@@ -54,10 +66,7 @@ package storage
 // 			t.Errorf("Result does not match query. \nExpected: \n%v\n Got:\n %v", entry, result)
 // 		}
 // 	}
-// 	count := reader.count()
-// 	if count != 50 {
-// 		t.Errorf("Entry count does not match, expected 50 got %v", count)
-// 	}
+
 // 	os.RemoveAll("./tmp")
 // }
 
@@ -66,9 +75,11 @@ package storage
 // 	err := os.Mkdir("tmp", 0700)
 
 // 	InitializeStorageEngine(Config{
-// 		MemtableFlushSize: 50,
+// 		MemtableFlushSize: 400,
 // 		DataDirectory:     "./tmp",
-// 		BlockSize:         100,
+// 		BlockSize:         11,
+// 		CompactionLevels:  5,
+// 		SSTableBlockCount: 49,
 // 	})
 // 	panicIfErr(err)
 
@@ -90,14 +101,24 @@ package storage
 // 		return
 // 	}
 
-// 	r1 := newSSTableReaderFromPath(fmt.Sprintf("./tmp/%v", index[0]))
-// 	r2 := newSSTableReaderFromPath(fmt.Sprintf("./tmp/%v", index[1]))
-// 	r3 := newSSTableReaderFromPath(fmt.Sprintf("./tmp/%v", index[2]))
-// 	w1 := newSSTableWriterFromPath("./tmp/output")
+// 	r1 := NewSSTableIteratorFromPath(fmt.Sprintf("%v", index[0][0]))
+// 	r2 := NewSSTableIteratorFromPath(fmt.Sprintf("%v", index[0][1]))
+// 	r3 := NewSSTableIteratorFromPath(fmt.Sprintf("%v", index[0][2]))
 
-// 	compactNSSTables([]*SSTableReader{&r1, &r2, &r3}, &w1)
+// 	paths, _ := compactNSSTables([]*SSTableIterator{r1, r2, r3}, 0)
 
-// 	reader := newSSTableReaderFromPath("./tmp/output")
+// 	it := NewSSTableIteratorFromPath(paths[0])
+
+// 	count := 0
+// 	for it.Next() {
+// 		count++
+// 	}
+
+// 	if count != 50 {
+// 		t.Errorf("Count is incorrect. Expected %v, got %v", 50, count)
+// 	}
+
+// 	reader := newSSTableScannerFromPath(paths[0])
 
 // 	for id := range 50 {
 // 		result, _ := reader.scan(IntToBytes(id))
@@ -111,10 +132,6 @@ package storage
 // 		if !reflect.DeepEqual(&entry, result) {
 // 			t.Errorf("Result does not match query. \nExpected: \n%v\n Got:\n %v", entry, result)
 // 		}
-// 	}
-// 	count := reader.count()
-// 	if count != 50 {
-// 		t.Errorf("Entry count does not match, expected 50 got %v", count)
 // 	}
 // 	os.RemoveAll("./tmp")
 // }
@@ -124,34 +141,45 @@ package storage
 // 	err := os.Mkdir("tmp", 0700)
 
 // 	InitializeStorageEngine(Config{
-// 		MemtableFlushSize: 50,
+// 		MemtableFlushSize: 400,
 // 		DataDirectory:     "./tmp",
-// 		BlockSize:         100,
+// 		BlockSize:         11,
+// 		CompactionLevels:  5,
+// 		SSTableBlockCount: 50,
 // 	})
 // 	panicIfErr(err)
 
 // 	for id := range 50 {
-// 		Insert(id, IntToBytes(1))
+// 		Insert(IntToBytes(id), IntToBytes(1))
 // 	}
 
 // 	for id := range 50 {
-// 		Insert(id, IntToBytes(5))
+// 		Insert(IntToBytes(id), IntToBytes(5))
 // 	}
 
 // 	index := fileManager.getDataIndex()
 
-// 	if len(index) < 2 {
+// 	if len(index[0]) < 2 {
 // 		return
 // 	}
 
-// 	r1 := newSSTableReaderFromPath(fmt.Sprintf("./tmp/%v", index[0]))
-// 	r2 := newSSTableReaderFromPath(fmt.Sprintf("./tmp/%v", index[1]))
-// 	w1 := newSSTableWriterFromPath("./tmp/output")
+// 	r1 := NewSSTableIteratorFromPath(fmt.Sprintf("%v", index[0][0]))
+// 	r2 := NewSSTableIteratorFromPath(fmt.Sprintf("%v", index[0][1]))
 
-// 	compactNSSTables([]*SSTableReader{&r1, &r2}, &w1)
+// 	paths, _ := compactNSSTables([]*SSTableIterator{r1, r2}, 0)
 
-// 	reader := newSSTableReaderFromPath("./tmp/output")
+// 	it := NewSSTableIteratorFromPath(paths[0])
 
+// 	count := 0
+// 	for it.Next() {
+// 		count++
+// 	}
+
+// 	if count != 50 {
+// 		t.Errorf("Count is incorrect. Expected %v, got %v", 50, count)
+// 	}
+
+// 	reader := newSSTableScannerFromPath(paths[0])
 // 	result, _ := reader.scan(IntToBytes(2))
 
 // 	entry := Entry{
@@ -164,59 +192,63 @@ package storage
 // 		t.Errorf("Result does not match query. \nExpected: \n%v\n Got:\n %v", entry, result)
 // 	}
 
-// 	count := reader.count()
-// 	if count != 50 {
-// 		t.Errorf("Entry count does not match, expected 50 got %v", count)
-// 	}
 // 	os.RemoveAll("./tmp")
 // }
 
-// // Compact two fully disjoint SSTables
-// func TestNoCompaction(t *testing.T) {
-// 	os.RemoveAll("./tmp")
-// 	err := os.Mkdir("tmp", 0700)
+func TestNoCompaction(t *testing.T) {
+	os.RemoveAll("./tmp")
+	err := os.Mkdir("tmp", 0700)
 
-// 	InitializeStorageEngine(Config{
-// 		MemtableFlushSize: 50,
-// 		DataDirectory:     "./tmp",
-// 		BlockSize:         100,
-// 	})
-// 	panicIfErr(err)
+	InitializeStorageEngine(Config{
+		MemtableFlushSize: 400,
+		DataDirectory:     "./tmp",
+		BlockSize:         11,
+		CompactionLevels:  5,
+		SSTableBlockCount: 50,
+	})
+	panicIfErr(err)
 
-// 	for id := range 100 {
-// 		Insert(IntToBytes(id), IntToBytes(id))
-// 	}
+	for id := range 100 {
+		Insert(IntToBytes(id), IntToBytes(id))
+	}
 
-// 	index := fileManager.getDataIndex()
+	index := fileManager.getDataIndex()
 
-// 	if len(index) < 2 {
-// 		return
-// 	}
+	if len(index[0]) < 2 {
+		return
+	}
 
-// 	r1 := newSSTableReaderFromPath(fmt.Sprintf("./tmp/%v", index[0]))
-// 	r2 := newSSTableReaderFromPath(fmt.Sprintf("./tmp/%v", index[1]))
-// 	w1 := newSSTableWriterFromPath("./tmp/output")
+	r1 := NewSSTableIteratorFromPath(fmt.Sprintf("%v", index[0][0]))
+	r2 := NewSSTableIteratorFromPath(fmt.Sprintf("%v", index[0][1]))
 
-// 	compactNSSTables([]*SSTableReader{&r1, &r2}, &w1)
+	paths, _ := compactNSSTables([]*SSTableIterator{r1, r2}, 0)
 
-// 	reader := newSSTableReaderFromPath("./tmp/output")
+	it := NewSSTableIteratorFromPath(paths[0])
 
-// 	for id := range 100 {
-// 		result, _ := reader.scan(IntToBytes(id))
+	count := 0
+	for it.Next() {
+		count++
+	}
 
-// 		entry := Entry{
-// 			IntToBytes(id),
-// 			IntToBytes(id),
-// 			false,
-// 		}
+	if count != 100 {
+		t.Errorf("Count is incorrect. Expected %v, got %v", 100, count)
+	}
 
-// 		if !reflect.DeepEqual(&entry, result) {
-// 			t.Errorf("Result does not match query. \nExpected: \n%v\n Got:\n %v", entry, result)
-// 		}
-// 	}
-// 	count := reader.count()
-// 	if count != 100 {
-// 		t.Errorf("Entry count does not match, expected 100 got %v", count)
-// 	}
-// 	os.RemoveAll("./tmp")
-// }
+	reader := newSSTableScannerFromPath(paths[0])
+
+	for id := range 100 {
+		result, _ := reader.scan(IntToBytes(id))
+
+		entry := Entry{
+			IntToBytes(id),
+			IntToBytes(id),
+			false,
+		}
+
+		if !reflect.DeepEqual(&entry, result) {
+			t.Errorf("Result does not match query. \nExpected: \n%v\n Got:\n %v", entry, result)
+		}
+	}
+
+	os.RemoveAll("./tmp")
+}
