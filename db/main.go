@@ -19,7 +19,7 @@ func main() {
 		CompactionLevels:            5,
 	})
 
-	for i := range 600 {
+	for i := range 5000 {
 		storage.Insert(storage.IntToBytes(i), storage.IntToBytes(i))
 	}
 

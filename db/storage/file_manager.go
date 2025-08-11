@@ -115,6 +115,30 @@ func (fileManager *FileManager) openReadFile(path string) (*os.File, error) {
 	return fd, nil
 }
 
+func (fileManager *FileManager) deleteFileFromLedger(fileName string, level int) error { //TODO: Make sure everything except L0 is sorted
+	//TODO: Make this operation atomic by using tmp files
+	file, err := fileManager.openWriteFile(fmt.Sprintf("%v/%v/%v", config.DataDirectory, level, "ledger"))
+	if err != nil {
+		return err
+	}
+
+	for idx, path := range fileManager.ledger[level] {
+		if path == fileName {
+			fileManager.ledger[level] = append(fileManager.ledger[level][:idx], fileManager.ledger[level][idx+1:]...)
+		}
+	}
+
+	fullPath := fmt.Sprintf("%v/%v/%v", config.DataDirectory, level, "ledger")
+	os.Truncate(fullPath, 0)
+
+	for _, path := range fileManager.ledger[level] {
+		file.Write([]byte(path + "\n"))
+	}
+	file.Sync()
+
+	return nil
+}
+
 func (fileManager *FileManager) addFileToLedger(fileName string, level int) error { //TODO: Make sure everything except L0 is sorted
 	//TODO: Make this operation atomic by using tmp files
 	file, err := fileManager.openWriteFile(fmt.Sprintf("%v/%v/%v", config.DataDirectory, level, "ledger"))

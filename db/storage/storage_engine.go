@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"log"
+	"os"
 )
 
 type Config struct {
@@ -75,11 +76,15 @@ func compact() {
 
 	paths, _ := compactNSSTables(readers, 1)
 	for _, path := range paths {
+		log.Printf("Adding file to ledger %v\n", path)
 		fileManager.addFileToLedger(path, 1)
 	}
 
 	log.Printf("I have compacted the following files into: %v", paths)
 	for _, r := range readers {
+		fileManager.deleteFileFromLedger(r.path, 0)
+		fileManager.deleteFileFromLedger(r.path, 1)
+		os.Remove(r.path)
 		log.Printf("	- %v", r.path)
 	}
 }

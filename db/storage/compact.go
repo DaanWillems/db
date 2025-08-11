@@ -69,7 +69,7 @@ func compactNSSTables(inputs []*SSTableIterator, level int) ([]string, error) {
 			}
 		}
 		if len(state) == 0 {
-			return []string{output.path}, nil
+			return []string{fileName}, nil
 		}
 		if len(state) == 1 {
 			_, serialized_entry := state[0].Entry().serialize()
