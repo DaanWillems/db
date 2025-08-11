@@ -23,7 +23,8 @@ func shouldCompactL0() bool {
 
 func compactNSSTables(inputs []*SSTableIterator, level int) ([]string, error) {
 	state := []*SSTableIterator{}
-	output := newSSTableWriterFromPath(fmt.Sprintf("%v/%v/%v", config.DataDirectory, level, fileManager.getNextFilename())) //TODO:Generate new file name
+	fileName := fileManager.getNextFilename()
+	output := newSSTableWriterFromPath(fmt.Sprintf("%v/%v/%v", config.DataDirectory, level, fileName)) //TODO:Generate new file name
 
 	for _, it := range inputs {
 		if ok := it.Next(); !ok {
@@ -77,7 +78,7 @@ func compactNSSTables(inputs []*SSTableIterator, level int) ([]string, error) {
 				_, serialized_entry := state[0].Entry().serialize()
 				output.writeSingleEntry(&serialized_entry)
 			}
-			return []string{output.path}, nil
+			return []string{fileName}, nil
 		}
 	}
 }

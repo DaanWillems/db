@@ -51,10 +51,10 @@ func initFileManager(rootPath string) error {
 
 	for i := range config.CompactionLevels {
 		subPath := fmt.Sprintf("%v/%v", rootPath, i)
-		err := os.Mkdir(subPath, 0744)
-		if err != nil {
-			return err
-		}
+		os.Mkdir(subPath, 0744)
+		// if err != nil {
+		// 	return err
+		// }
 
 		ledgerFile, err := fileManager.openWriteFile(fmt.Sprintf("%v/%v", subPath, "ledger"))
 		if err != nil {
