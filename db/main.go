@@ -10,7 +10,7 @@ func main() {
 	log.Println("Starting...")
 
 	storage.InitializeStorageEngine(storage.Config{
-		MemtableFlushSize:           500,
+		MemtableFlushSize:           800,
 		DataDirectory:               "./data",
 		BlockSize:                   200,
 		SSTableBlockCount:           10,
@@ -19,11 +19,15 @@ func main() {
 		CompactionLevels:            5,
 	})
 
-	for i := range 600 {
+	for i := 0; i < 600; i++ {
+		log.Printf("Inserting.. %v", i)
 		storage.Insert(storage.IntToBytes(i), storage.IntToBytes(i))
 	}
 
-	result, _ := storage.Query(storage.IntToBytes(300))
+	storage.Insert(storage.IntToBytes(20), storage.IntToBytes(1))
+	storage.Flush()
+	storage.Compact()
+	result, _ := storage.Query(storage.IntToBytes(20))
 	fmt.Printf("%08b\n", result)
 
 	storage.Close()

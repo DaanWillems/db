@@ -10,6 +10,7 @@ type SSTableIterator struct {
 	blockIterator *SSTableBlockIterator
 	lastEntry     *Entry
 	lastBlock     *bytes.Buffer
+	path          string
 	error         error
 }
 
@@ -21,6 +22,7 @@ func NewSSTableIterator(reader *SSTableReader) *SSTableIterator {
 
 func NewSSTableIteratorFromPath(path string) *SSTableIterator {
 	return &SSTableIterator{
+		path:          path,
 		blockIterator: NewSSTableBlockIteratorFromPath(path),
 	}
 }
