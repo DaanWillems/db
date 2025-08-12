@@ -29,15 +29,14 @@ func InitializeStorageEngine(cfg Config) {
 	openWAL(fmt.Sprintf("./%v/wal", cfg.DataDirectory))
 
 	fileName := fileManager.getNextFilename()
-	currentWriter = newSSTableWriterFromPath(fmt.Sprintf("%v/%v/%v", config.DataDirectory, "0", fileName))
-	fileManager.addFileToLedger(fileName, 0)
+	currentWriter = newSSTableWriterFromPath(fmt.Sprintf("%v/%v/%v", config.DataDirectory, "tmp", fileName))
 }
 
 func Close() {
 	fileManager.close()
 }
 
-func Compact() {
+func LevelledCompact() {
 	log.Println("Compacting L0")
 	readers := []*SSTableIterator{}
 	index := fileManager.getDataIndex()
@@ -50,11 +49,9 @@ func Compact() {
 		maxID, _ := newSSTableScannerFromPath(index[0][idx]).getLastID()
 		if L0minID == nil || bytes.Compare(L0minID, minID) == 1 {
 			L0minID = minID
-			continue
 		}
 		if L0maxID == nil || bytes.Compare(L0maxID, maxID) == -1 {
 			L0maxID = maxID
-			continue
 		}
 	}
 
@@ -68,9 +65,10 @@ func Compact() {
 		minID, _ := scanner.getFirstID()
 		maxID, _ := scanner.getLastID()
 
-		if bytes.Compare(minID, L0minID) == 1 || bytes.Equal(minID, L0minID) || bytes.Compare(maxID, L0maxID) == -1 || bytes.Equal(maxID, L0maxID) {
+		//TODO test this check..
+		if rangeIsOverlapping(minID, maxID, L0minID, L0maxID) {
 			reader := NewSSTableIteratorFromPath(path)
-			readers = append(readers, reader)
+			readers = append([]*SSTableIterator{reader}, readers...)
 		}
 	}
 
@@ -89,11 +87,30 @@ func Compact() {
 	}
 }
 
+func SwapWriter() {
+	//Move file
+	fileManager.addFileToLedger(currentWriter.path, 0)
+	fileName := fileManager.getNextFilename()
+	currentWriter = newSSTableWriterFromPath(fmt.Sprintf("%v/%v/%v", config.DataDirectory, "tmp", fileName))
+}
+
 func Flush() {
 	log.Println("Flushing..")
 	fileManager.storeMemtable(&memtable)
 	memtable = newMemtable() // Reset memtable after flushing
 	resetWAL()               //Discard the WAL
+	SwapWriter()
+}
+
+func write(entry *[]byte) error {
+	if currentWriter.currentBlock >= config.SSTableBlockCount {
+		SwapWriter()
+	}
+	err := currentWriter.writeSingleEntry(entry)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func Insert(id []byte, value []byte) error {
@@ -109,7 +126,7 @@ func Insert(id []byte, value []byte) error {
 	if memtable.totalByteSize >= config.MemtableFlushSize {
 		Flush()
 		if shouldCompactL0() {
-			Compact()
+			LevelledCompact()
 		}
 	}
 

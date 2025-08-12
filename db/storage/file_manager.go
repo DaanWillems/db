@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -151,8 +152,11 @@ func (fileManager *FileManager) deleteFileFromLedger(fileName string, level int)
 	return nil
 }
 
-func (fileManager *FileManager) addFileToLedger(fileName string, level int) error { //TODO: Make sure everything except L0 is sorted
+func (fileManager *FileManager) addFileToLedger(path string, level int) error { //TODO: Make sure everything except L0 is sorted
 	//TODO: Make this operation atomic by using tmp files
+	path_split := strings.Split(path, "/")
+	fullPath := fmt.Sprintf("%v/%v/%v", config.DataDirectory, level, path_split[len(path_split)-1])
+
 	ledgerPath := fmt.Sprintf("%v/%v/%v", config.DataDirectory, level, "ledger")
 	file, err := fileManager.openWriteFile(ledgerPath)
 	defer fileManager.closeFile(ledgerPath)
@@ -160,10 +164,10 @@ func (fileManager *FileManager) addFileToLedger(fileName string, level int) erro
 	if err != nil {
 		return err
 	}
-	fullPath := fmt.Sprintf("%v/%v/%v", config.DataDirectory, level, fileName)
 	fileManager.ledger[level] = append(fileManager.ledger[level], fullPath)
 	file.Write([]byte(fullPath + "\n"))
 	file.Sync()
+	os.Rename(path, fullPath)
 
 	return nil
 }
@@ -175,7 +179,7 @@ func (fileManager *FileManager) storeMemtable(memtable *Memtable) {
 
 	// fileName := fmt.Sprintf("%v.sst", len(fileManager.ledger[0])) //TODO: Generate new file name appropriately
 	// writer := newSSTableWriterFromPath(fmt.Sprintf("./%v/0/%v", config.DataDirectory, fileName))
-	err := currentWriter.writeFromMemtable(memtable)
+	err := writeFromMemtable(memtable)
 
 	log.Printf("Stored into %v", currentWriter.path)
 	if err != nil {

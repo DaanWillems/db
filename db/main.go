@@ -26,7 +26,7 @@ func main() {
 
 	storage.Insert(storage.IntToBytes(20), storage.IntToBytes(1))
 	storage.Flush()
-	storage.Compact()
+	storage.LevelledCompact()
 	result, _ := storage.Query(storage.IntToBytes(20))
 	fmt.Printf("%08b\n", result)
 

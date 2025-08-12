@@ -24,9 +24,9 @@ func shouldCompactL0() bool {
 func compactNSSTables(inputs []*SSTableIterator, level int) ([]string, error) {
 	state := []*SSTableIterator{}
 
-	fileName := fileManager.getNextFilename()
+	fileName := fmt.Sprintf("%v/tmp/%v", config.DataDirectory, fileManager.getNextFilename())
 	fileNames := []string{fileName}
-	output := newSSTableWriterFromPath(fmt.Sprintf("%v/%v/%v", config.DataDirectory, level, fileName)) //TODO:Generate new file name
+	output := newSSTableWriterFromPath(fileName) //TODO:Generate new file name
 
 	for _, it := range inputs {
 		if ok := it.Next(); !ok {
@@ -60,8 +60,8 @@ func compactNSSTables(inputs []*SSTableIterator, level int) ([]string, error) {
 		_, serialized_entry := outputIt[len(outputIt)-1].Entry().serialize()
 
 		if output.currentBlock >= config.SSTableBlockCount {
-			fileName := fileManager.getNextFilename()
-			output = newSSTableWriterFromPath(fmt.Sprintf("%v/%v/%v", config.DataDirectory, level, fileName)) //TODO:Generate new file name
+			fileName := fmt.Sprintf("%v/tmp/%v", config.DataDirectory, fileManager.getNextFilename())
+			output = newSSTableWriterFromPath(fileName) //TODO:Generate new file name
 			fileNames = append(fileNames, fileName)
 		}
 

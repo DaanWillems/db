@@ -3,7 +3,7 @@ package storage
 import (
 	"bufio"
 	"errors"
-	"fmt"
+	"strings"
 )
 
 type SSTableWriter struct {
@@ -11,15 +11,18 @@ type SSTableWriter struct {
 	currentBlockLen int //The length of the current block we're writing to
 	currentBlock    int //The current block we're writing to
 	path            string
+	fileName        string
 }
 
 func newSSTableWriterFromPath(path string) SSTableWriter {
 	fd, err := fileManager.openWriteFile(path)
+	path_split := strings.Split(path, "/")
 	panicIfErr(err)
 	return SSTableWriter{
 		buffer:          bufio.NewWriter(fd),
 		currentBlockLen: 0,
 		path:            path,
+		fileName:        path_split[len(path_split)-1],
 	}
 }
 
@@ -56,19 +59,11 @@ func (writer *SSTableWriter) writeSingleEntry(entry *[]byte) error {
 	return nil
 }
 
-func (writer *SSTableWriter) writeFromMemtable(memtable *Memtable) error {
+func writeFromMemtable(memtable *Memtable) error {
 	for e := memtable.entries.Front(); e != nil; e = e.Next() {
 		entry := e.Value.(Entry)
 		_, serialized_entry := entry.serialize()
-		if writer.currentBlock >= config.SSTableBlockCount {
-			fileName := fileManager.getNextFilename()
-			currentWriter = newSSTableWriterFromPath(fmt.Sprintf("%v/%v/%v", config.DataDirectory, "0", fileName))
-			fileManager.addFileToLedger(fileName, 0)
-		}
-		err := writer.writeSingleEntry(&serialized_entry)
-		if err != nil {
-			return err
-		}
+		write(&serialized_entry)
 	}
 	return nil
 }
