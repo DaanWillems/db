@@ -8,8 +8,6 @@ import (
 
 func main() {
 	log.Println("Starting...")
-	// os.RemoveAll("./data")
-	// os.Mkdir("./data", 0700)
 
 	storage.InitializeStorageEngine(storage.Config{
 		MemtableFlushSize:           500,
