@@ -86,6 +86,17 @@ func (fileManager *FileManager) getDataIndex() map[int][]string {
 	return fileManager.ledger
 }
 
+func (fileManager *FileManager) closeFile(path string) {
+	if val, ok := fileManager.openWriteFiles[path]; ok {
+		val.Close()
+		delete(fileManager.openWriteFiles, path)
+	}
+	if val, ok := fileManager.openReadFiles[path]; ok {
+		val.Close()
+		delete(fileManager.openReadFiles, path)
+	}
+}
+
 func (fileManager *FileManager) openWriteFile(path string) (*os.File, error) {
 	if val, ok := fileManager.openWriteFiles[path]; ok {
 		return val, nil
@@ -117,7 +128,10 @@ func (fileManager *FileManager) openReadFile(path string) (*os.File, error) {
 
 func (fileManager *FileManager) deleteFileFromLedger(fileName string, level int) error { //TODO: Make sure everything except L0 is sorted
 	//TODO: Make this operation atomic by using tmp files
-	file, err := fileManager.openWriteFile(fmt.Sprintf("%v/%v/%v", config.DataDirectory, level, "ledger"))
+	ledgerPath := fmt.Sprintf("%v/%v/%v", config.DataDirectory, level, "ledger")
+	os.Truncate(ledgerPath, 0)
+	file, err := fileManager.openWriteFile(ledgerPath)
+	defer fileManager.closeFile(ledgerPath)
 	if err != nil {
 		return err
 	}
@@ -128,12 +142,10 @@ func (fileManager *FileManager) deleteFileFromLedger(fileName string, level int)
 		}
 	}
 
-	fullPath := fmt.Sprintf("%v/%v/%v", config.DataDirectory, level, "ledger")
-	os.Truncate(fullPath, 0)
-
 	for _, path := range fileManager.ledger[level] {
 		file.Write([]byte(path + "\n"))
 	}
+
 	file.Sync()
 
 	return nil
@@ -141,7 +153,10 @@ func (fileManager *FileManager) deleteFileFromLedger(fileName string, level int)
 
 func (fileManager *FileManager) addFileToLedger(fileName string, level int) error { //TODO: Make sure everything except L0 is sorted
 	//TODO: Make this operation atomic by using tmp files
-	file, err := fileManager.openWriteFile(fmt.Sprintf("%v/%v/%v", config.DataDirectory, level, "ledger"))
+	ledgerPath := fmt.Sprintf("%v/%v/%v", config.DataDirectory, level, "ledger")
+	file, err := fileManager.openWriteFile(ledgerPath)
+	defer fileManager.closeFile(ledgerPath)
+
 	if err != nil {
 		return err
 	}

@@ -76,7 +76,7 @@ func compact() {
 
 	paths, _ := compactNSSTables(readers, 1)
 	for _, path := range paths {
-		log.Printf("Adding file to ledger %v\n", path)
+		log.Printf("Adding file to ledger level 1: %v\n", path)
 		fileManager.addFileToLedger(path, 1)
 	}
 

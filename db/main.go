@@ -19,8 +19,8 @@ func main() {
 		CompactionLevels:            5,
 	})
 
-	for i := range 5000 {
-		storage.Insert(storage.IntToBytes(i), storage.IntToBytes(i))
+	for i := 300; i < 400; i++ {
+		storage.Insert(storage.IntToBytes(i), storage.IntToBytes(5))
 	}
 
 	result, _ := storage.Query(storage.IntToBytes(300))
