@@ -177,6 +177,7 @@ func (fileManager *FileManager) storeMemtable(memtable *Memtable) {
 	// writer := newSSTableWriterFromPath(fmt.Sprintf("./%v/0/%v", config.DataDirectory, fileName))
 	err := currentWriter.writeFromMemtable(memtable)
 
+	log.Printf("Stored into %v", currentWriter.path)
 	if err != nil {
 		panic(err)
 	}

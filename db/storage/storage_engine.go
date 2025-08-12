@@ -37,7 +37,7 @@ func Close() {
 	fileManager.close()
 }
 
-func compact() {
+func Compact() {
 	log.Println("Compacting L0")
 	readers := []*SSTableIterator{}
 	index := fileManager.getDataIndex()
@@ -89,6 +89,13 @@ func compact() {
 	}
 }
 
+func Flush() {
+	log.Println("Flushing..")
+	fileManager.storeMemtable(&memtable)
+	memtable = newMemtable() // Reset memtable after flushing
+	resetWAL()               //Discard the WAL
+}
+
 func Insert(id []byte, value []byte) error {
 	entry := Entry{
 		id:      id,
@@ -100,11 +107,9 @@ func Insert(id []byte, value []byte) error {
 	memtable.insert(entry)
 
 	if memtable.totalByteSize >= config.MemtableFlushSize {
-		fileManager.storeMemtable(&memtable)
-		memtable = newMemtable() // Reset memtable after flushing
-		resetWAL()               //Discard the WAL
+		Flush()
 		if shouldCompactL0() {
-			compact()
+			Compact()
 		}
 	}
 
