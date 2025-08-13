@@ -14,23 +14,25 @@ type SSTableWriter struct {
 	fileName        string
 }
 
-func newSSTableWriterFromPath(path string) SSTableWriter {
+func newSSTableWriterFromPath(path string) (SSTableWriter, error) {
 	fd, err := fileManager.openWriteFile(path)
+	if err != nil {
+		return SSTableWriter{}, err
+	}
 	path_split := strings.Split(path, "/")
-	panicIfErr(err)
 	return SSTableWriter{
 		buffer:          bufio.NewWriter(fd),
 		currentBlockLen: 0,
 		path:            path,
 		fileName:        path_split[len(path_split)-1],
-	}
+	}, nil
 }
 
-func (writer *SSTableWriter) spaceAvailableInBlock(size int) bool {
+func (writer *SSTableWriter) spaceAvailableInCurrentBlock(size int) bool {
 	return (config.BlockSize - writer.currentBlockLen) >= size
 }
 
-func (writer *SSTableWriter) padBlock() {
+func (writer *SSTableWriter) padCurrentBlock() {
 	padding := config.BlockSize - writer.currentBlockLen
 
 	_, err := writer.buffer.Write(make([]byte, padding))
@@ -48,8 +50,8 @@ func (writer *SSTableWriter) writeSingleEntry(entry *[]byte) error {
 		return errors.New("entry larger than max block size")
 	}
 
-	if !writer.spaceAvailableInBlock(len(*entry)) {
-		writer.padBlock()
+	if !writer.spaceAvailableInCurrentBlock(len(*entry)) {
+		writer.padCurrentBlock()
 	}
 
 	writer.currentBlockLen += len(*entry)

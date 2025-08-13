@@ -29,7 +29,11 @@ func InitializeStorageEngine(cfg Config) {
 	openWAL(fmt.Sprintf("./%v/wal", cfg.DataDirectory))
 
 	fileName := fileManager.getNextFilename()
-	currentWriter = newSSTableWriterFromPath(fmt.Sprintf("%v/%v/%v", config.DataDirectory, "tmp", fileName))
+	var err error
+	currentWriter, err = newSSTableWriterFromPath(fmt.Sprintf("%v/%v/%v", config.DataDirectory, "tmp", fileName))
+	if err != nil {
+		log.Fatalf("Failed to initialize writer: %v", err.Error())
+	}
 }
 
 func Close() {
@@ -91,7 +95,11 @@ func SwapWriter() {
 	//Move file
 	fileManager.addFileToLedger(currentWriter.path, 0)
 	fileName := fileManager.getNextFilename()
-	currentWriter = newSSTableWriterFromPath(fmt.Sprintf("%v/%v/%v", config.DataDirectory, "tmp", fileName))
+	var err error
+	currentWriter, err = newSSTableWriterFromPath(fmt.Sprintf("%v/%v/%v", config.DataDirectory, "tmp", fileName))
+	if err != nil {
+		log.Fatalf("Failed to swap writer: %v", err.Error())
+	}
 }
 
 func Flush() {

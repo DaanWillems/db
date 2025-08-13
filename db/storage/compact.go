@@ -26,7 +26,7 @@ func compactNSSTables(inputs []*SSTableIterator, level int) ([]string, error) {
 
 	fileName := fmt.Sprintf("%v/tmp/%v", config.DataDirectory, fileManager.getNextFilename())
 	fileNames := []string{fileName}
-	output := newSSTableWriterFromPath(fileName) //TODO:Generate new file name
+	output, _ := newSSTableWriterFromPath(fileName) //TODO:Generate new file name
 
 	for _, it := range inputs {
 		if ok := it.Next(); !ok {
@@ -61,7 +61,7 @@ func compactNSSTables(inputs []*SSTableIterator, level int) ([]string, error) {
 
 		if output.currentBlock >= config.SSTableBlockCount {
 			fileName := fmt.Sprintf("%v/tmp/%v", config.DataDirectory, fileManager.getNextFilename())
-			output = newSSTableWriterFromPath(fileName) //TODO:Generate new file name
+			output, _ = newSSTableWriterFromPath(fileName) //TODO:Generate new file name
 			fileNames = append(fileNames, fileName)
 		}
 
