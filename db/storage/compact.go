@@ -3,77 +3,91 @@ package storage
 import (
 	"bytes"
 	"fmt"
+	"os"
 )
 
-func getNextEntry(readers []*SSTableReader) (*Entry, []*SSTableReader) {
-	var min []byte
-	outputReaders := []*SSTableReader{}
-	emptyReaders := []*SSTableReader{}
-
-	//Get reader with smallest key
-	//Its assumed that readers are ordered oldest to newest
-	for _, reader := range readers {
-		id, err := reader.peekNextId()
-		if checkEOF(err) {
-			emptyReaders = append(emptyReaders, reader)
-			continue
+func shouldCompactL0() bool {
+	var byteSize int64
+	byteSize = 0
+	//Check if we should compact
+	for _, path := range fileManager.getDataIndex()[0] { //Check level 0
+		file, err := os.Stat(path)
+		if err != nil {
+			return false
 		}
 
-		if min == nil {
-			min = id
-			outputReaders = append(outputReaders, reader)
-		} else if bytes.Compare(id, min) == -1 {
-			min = id
-			outputReaders := []*SSTableReader{}
-			outputReaders = append(outputReaders, reader)
-		} else if bytes.Equal(id, min) {
-			outputReaders = append(outputReaders, reader)
-		}
+		byteSize += file.Size()
 	}
-
-	var entry Entry
-
-	for _, reader := range outputReaders {
-		entry, _ = reader.readNextEntry() //use the latest (most recent) newest entry
-	}
-
-	return &entry, emptyReaders
+	return byteSize > int64(config.Level0CompactionTriggerSize)
 }
 
-// TODO: Write to temp files during compaction, and copy over atomatically
-// Returns a sorted list of paths to files
-func compactNSSTables(inputs []*SSTableReader, level int) ([]string, error) {
-	output := newSSTableWriterFromPath(fmt.Sprintf("%v/tmp/%v", config.DataDirectory, fileManager.getNextFilename())) //TODO:Generate new file name
+func compactNSSTables(inputs []*SSTableIterator, level int) ([]string, error) {
+	state := []*SSTableIterator{}
+
+	fileName := fmt.Sprintf("%v/tmp/%v", config.DataDirectory, fileManager.getNextFilename())
+	fileNames := []string{fileName}
+	output, _ := newSSTableWriterFromPath(fileName) //TODO:Generate new file name
+
+	for _, it := range inputs {
+		if ok := it.Next(); !ok {
+			continue
+		}
+		state = append(state, it)
+	}
 
 	for {
-		entry, emptyReaders := getNextEntry(inputs)
-		output.writeSingleEntry(entry)
+		var min []byte
+		outputIt := []*SSTableIterator{}
 
-		for _, emptyReader := range emptyReaders {
-			for index, reader := range inputs {
-				if reader == emptyReader {
-					//Remove from map
-					inputs = append(inputs[:index], inputs[index+1:]...)
-				}
+		for _, it := range state {
+			entry := it.Entry()
+			if entry == nil {
+				continue
+			}
+
+			if min == nil {
+				min = it.Entry().id
+				outputIt = append(outputIt, it)
+			} else if bytes.Compare(it.Entry().id, min) == -1 {
+				min = it.Entry().id
+				outputIt = []*SSTableIterator{}
+				outputIt = append(outputIt, it)
+			} else if bytes.Equal(it.Entry().id, min) {
+				outputIt = append(outputIt, it)
 			}
 		}
 
-		if len(inputs) == 0 {
-			return []string{output.path}, nil
+		_, serialized_entry := outputIt[len(outputIt)-1].Entry().serialize()
+
+		if output.currentBlock >= config.SSTableBlockCount {
+			fileName := fmt.Sprintf("%v/tmp/%v", config.DataDirectory, fileManager.getNextFilename())
+			output, _ = newSSTableWriterFromPath(fileName) //TODO:Generate new file name
+			fileNames = append(fileNames, fileName)
 		}
-		if len(inputs) == 1 {
-			for _, remainder := range inputs {
-				for {
-					entry, err := remainder.readNextEntry()
-					if checkEOF(err) {
-						return []string{output.path}, nil
+
+		output.writeSingleEntry(&serialized_entry)
+
+		for _, it := range outputIt {
+			if ok := it.Next(); !ok {
+				for idx, it2 := range state {
+					if it2 == it {
+						state = append(state[:idx], state[idx+1:]...)
+						break
 					}
-					if err != nil {
-						return nil, err
-					}
-					output.writeSingleEntry(&entry)
 				}
 			}
+		}
+		if len(state) == 0 {
+			return []string{fileName}, nil
+		}
+		if len(state) == 1 {
+			_, serialized_entry := state[0].Entry().serialize()
+			output.writeSingleEntry(&serialized_entry)
+			for state[0].Next() {
+				_, serialized_entry := state[0].Entry().serialize()
+				output.writeSingleEntry(&serialized_entry)
+			}
+			return fileNames, nil
 		}
 	}
 }

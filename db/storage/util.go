@@ -9,53 +9,13 @@ import (
 	"log"
 )
 
-type DbType int
-
-const (
-	DbStringType DbType = iota
-	DbBoolType
-	DbInt8Type
-)
-
-var dbTypeName = map[DbType]string{
-	DbStringType: "string",
-	DbBoolType:   "bool",
-	DbInt8Type:   "int8",
-}
-
-func (t DbType) String() string {
-	return dbTypeName[t]
-}
-
-type Serializable interface {
-	Bytes() []byte
-}
-
-type DbString struct {
-	Value string
-}
-
-func (s DbString) Bytes() []byte {
-	return []byte(s.Value)
-}
-
-type DbInt8 struct {
-	Value int
-}
-
-func (i DbInt8) Bytes() []byte {
-	return []byte{byte(i.Value)}
-}
-
-type DbBool struct {
-	Value bool
-}
-
-func (b DbBool) Bytes() []byte {
-	if b.Value {
-		return []byte{byte(1)}
+func rangeIsOverlapping(min0 []byte, max0 []byte, min1 []byte, max1 []byte) bool {
+	if (bytes.Compare(min0, min1) == 1 && bytes.Compare(min0, max1) == -1) ||
+		(bytes.Compare(min1, min0) == 1 && bytes.Compare(min1, max0) == -1) ||
+		(bytes.Equal(min0, min1) || bytes.Equal(max0, max1)) {
+		return true
 	}
-	return []byte{byte(0)}
+	return false
 }
 
 func IntToBytes(i int) []byte {

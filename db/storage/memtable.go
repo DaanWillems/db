@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"bufio"
 	"bytes"
 	"container/list"
 	"errors"
@@ -20,10 +19,14 @@ type Entry struct {
 	deleted bool
 }
 
-func (entry *Entry) deserialize(buf *bufio.Reader) error {
+func (entry *Entry) deserialize(buf *bytes.Buffer) error {
 	idLen, err := mustReadByte(buf)
 	if err != nil {
 		return err
+	}
+
+	if idLen == byte(0) {
+		return io.EOF
 	}
 
 	id, err := mustReadN(buf, int(idLen))
@@ -135,7 +138,7 @@ func (m Memtable) insertRaw(id []byte, value []byte) {
 	m.insert(entry)
 }
 
-func mustReadN(buf *bufio.Reader, n int) ([]byte, error) {
+func mustReadN(buf *bytes.Buffer, n int) ([]byte, error) {
 	b := make([]byte, n)
 	readN, err := buf.Read(b)
 
@@ -151,7 +154,7 @@ func mustReadN(buf *bufio.Reader, n int) ([]byte, error) {
 	return b, nil
 }
 
-func mustReadByte(buf *bufio.Reader) (byte, error) {
+func mustReadByte(buf *bytes.Buffer) (byte, error) {
 	b, err := buf.ReadByte()
 	if err != nil {
 		if errors.Is(err, io.EOF) {

@@ -16,7 +16,7 @@
             "type": "go",
             "request": "launch",
             "mode": "test",
-            "program": "${workspaceFolder}/storage",
+            "program": "${workspaceFolder}/db/storage",
             "showLog": true
         }  
     ]

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -42,19 +43,19 @@ func initFileManager(rootPath string) error {
 		openWriteFiles: map[string]*os.File{},
 		ledger:         map[int][]string{},
 	}
-	err := os.RemoveAll(rootPath) //Temporary for testing
-	err = os.Mkdir(rootPath, 0644)
-	err = os.Mkdir(rootPath+"/tmp", 0644)
-	if err != nil {
-		return err
-	}
+	// err := os.RemoveAll(rootPath) //Temporary for testing
+	os.Mkdir(rootPath, 0744)
+	os.Mkdir(rootPath+"/tmp", 0744)
+	// if err != nil {
+	// 	return err
+	// }
 
 	for i := range config.CompactionLevels {
 		subPath := fmt.Sprintf("%v/%v", rootPath, i)
-		err := os.Mkdir(subPath, 0644)
-		if err != nil {
-			return err
-		}
+		os.Mkdir(subPath, 0744)
+		// if err != nil {
+		// 	return err
+		// }
 
 		ledgerFile, err := fileManager.openWriteFile(fmt.Sprintf("%v/%v", subPath, "ledger"))
 		if err != nil {
@@ -86,11 +87,22 @@ func (fileManager *FileManager) getDataIndex() map[int][]string {
 	return fileManager.ledger
 }
 
+func (fileManager *FileManager) closeFile(path string) {
+	if val, ok := fileManager.openWriteFiles[path]; ok {
+		val.Close()
+		delete(fileManager.openWriteFiles, path)
+	}
+	if val, ok := fileManager.openReadFiles[path]; ok {
+		val.Close()
+		delete(fileManager.openReadFiles, path)
+	}
+}
+
 func (fileManager *FileManager) openWriteFile(path string) (*os.File, error) {
 	if val, ok := fileManager.openWriteFiles[path]; ok {
 		return val, nil
 	}
-	fd, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0644)
+	fd, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0777)
 
 	if err != nil {
 		return nil, err
@@ -115,16 +127,47 @@ func (fileManager *FileManager) openReadFile(path string) (*os.File, error) {
 	return fd, nil
 }
 
-func (fileManager *FileManager) addFileToLedger(fileName string, level int) error { //TODO: Make sure everything except L0 is sorted
+func (fileManager *FileManager) deleteFileFromLedger(fileName string, level int) error { //TODO: Make sure everything except L0 is sorted
 	//TODO: Make this operation atomic by using tmp files
-	file, err := fileManager.openWriteFile(fmt.Sprintf("%v/%v/%v", config.DataDirectory, level, "ledger"))
+	ledgerPath := fmt.Sprintf("%v/%v/%v", config.DataDirectory, level, "ledger")
+	os.Truncate(ledgerPath, 0)
+	file, err := fileManager.openWriteFile(ledgerPath)
+	defer fileManager.closeFile(ledgerPath)
 	if err != nil {
 		return err
 	}
-	fullPath := fmt.Sprintf("%v/%v/%v", config.DataDirectory, level, fileName)
+
+	for idx, path := range fileManager.ledger[level] {
+		if path == fileName {
+			fileManager.ledger[level] = append(fileManager.ledger[level][:idx], fileManager.ledger[level][idx+1:]...)
+		}
+	}
+
+	for _, path := range fileManager.ledger[level] {
+		file.Write([]byte(path + "\n"))
+	}
+
+	file.Sync()
+
+	return nil
+}
+
+func (fileManager *FileManager) addFileToLedger(path string, level int) error { //TODO: Make sure everything except L0 is sorted
+	//TODO: Make this operation atomic by using tmp files
+	path_split := strings.Split(path, "/")
+	fullPath := fmt.Sprintf("%v/%v/%v", config.DataDirectory, level, path_split[len(path_split)-1])
+
+	ledgerPath := fmt.Sprintf("%v/%v/%v", config.DataDirectory, level, "ledger")
+	file, err := fileManager.openWriteFile(ledgerPath)
+	defer fileManager.closeFile(ledgerPath)
+
+	if err != nil {
+		return err
+	}
 	fileManager.ledger[level] = append(fileManager.ledger[level], fullPath)
 	file.Write([]byte(fullPath + "\n"))
 	file.Sync()
+	os.Rename(path, fullPath)
 
 	return nil
 }
@@ -134,13 +177,12 @@ func (fileManager *FileManager) storeMemtable(memtable *Memtable) {
 		panic("databaseFileStructure is not loaded")
 	}
 
-	fileName := fmt.Sprintf("%v.sst", len(fileManager.ledger[0])) //TODO: Generate new file name appropriately
-	writer := newSSTableWriterFromPath(fmt.Sprintf("./%v/0/%v", config.DataDirectory, fileName))
-	err := writer.writeFromMemtable(memtable)
+	// fileName := fmt.Sprintf("%v.sst", len(fileManager.ledger[0])) //TODO: Generate new file name appropriately
+	// writer := newSSTableWriterFromPath(fmt.Sprintf("./%v/0/%v", config.DataDirectory, fileName))
+	err := writeFromMemtable(memtable)
 
+	log.Printf("Stored into %v", currentWriter.path)
 	if err != nil {
 		panic(err)
 	}
-
-	fileManager.addFileToLedger(fileName, 0)
 }
